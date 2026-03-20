@@ -17,6 +17,7 @@ const API_BASE =
 const BUYER_EMAIL = process.env.OPEDD_BUYER_EMAIL;
 const PAYMENT_METHOD_ID = process.env.OPEDD_PAYMENT_METHOD_ID;
 const API_KEY = process.env.OPEDD_API_KEY; // publisher API key (op_...)
+const BUYER_TOKEN = process.env.OPEDD_BUYER_TOKEN; // buyer API token (bk_live_...)
 
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────
 
@@ -161,6 +162,32 @@ const TOOLS: Tool[] = [
   },
 ];
 
+// If a buyer token is configured, expose content delivery tooling
+if (BUYER_TOKEN) {
+  TOOLS.push({
+    name: "get_content",
+    description:
+      "Retrieve the full body of a licensed article using a buyer API token (bk_live_...). " +
+      "Requires OPEDD_BUYER_TOKEN env var (create one at opedd.com/licenses after purchasing). " +
+      "Works for per-article licenses (token scoped to that article) and archive licenses (token covers all publisher content). " +
+      "The publisher must have content delivery enabled and must have pushed content for the article.",
+    inputSchema: {
+      type: "object",
+      required: ["article_id"],
+      properties: {
+        article_id: {
+          type: "string",
+          description: "The Opedd article UUID to retrieve content for",
+        },
+        buyer_token: {
+          type: "string",
+          description: "Buyer API token (bk_live_...). Falls back to OPEDD_BUYER_TOKEN env var.",
+        },
+      },
+    },
+  });
+}
+
 // If a publisher API key is configured, expose publisher-specific tooling
 if (API_KEY) {
   TOOLS.push({
@@ -296,6 +323,29 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         params.set("limit", String(Math.min(Number(limit), 50)));
 
         const data = await opeddFetch(`/registry?${params.toString()}`);
+        return ok(data);
+      }
+
+      // ── get_content ────────────────────────────────────────────────────────
+      case "get_content": {
+        const { article_id, buyer_token: argToken } = args as {
+          article_id: string;
+          buyer_token?: string;
+        };
+        if (!article_id) return err("article_id is required");
+
+        const token = argToken || BUYER_TOKEN;
+        if (!token) {
+          return err(
+            "buyer_token is required (or set the OPEDD_BUYER_TOKEN env var). " +
+            "Create a token at opedd.com/licenses after purchasing a license."
+          );
+        }
+
+        const data = await opeddFetch(
+          `/content-delivery?article_id=${encodeURIComponent(article_id)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
         return ok(data);
       }
 
