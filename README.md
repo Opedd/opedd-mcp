@@ -90,7 +90,7 @@ The assistant will call the appropriate Opedd tools, show you the results, and�
 
 ## Payment methods
 
-Purchases use **Stripe** by default (via `pm_...` payment method IDs). USDC on Base is also supported by the Opedd API — pass `payment: { method: 'usdc', tx_hash: '0x...' }` directly to `agent-purchase` if building a custom integration.
+Purchases use **Stripe** by default (via `pm_...` payment method IDs). USDC on Tempo is also supported by the Opedd API — pass `payment: { method: 'usdc', tx_hash: '0x...' }` directly to `agent-purchase` if building a custom integration.
 
 ## Development
 
