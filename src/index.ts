@@ -29,7 +29,12 @@ async function opeddFetch(path: string, options: RequestInit = {}): Promise<unkn
     ...(options.headers as Record<string, string> ?? {}),
   };
   const res = await fetch(url, { ...options, headers });
-  return res.json();
+  const body = await res.json();
+  if (!res.ok) {
+    const msg = (body as any)?.error || (body as any)?.message || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return body;
 }
 
 // ─── MCP response helpers ─────────────────────────────────────────────────────
