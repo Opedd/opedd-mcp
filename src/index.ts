@@ -12,7 +12,7 @@ import {
 
 const API_BASE =
   process.env.OPEDD_API_URL ??
-  "https://djdzcciayennqchjgybx.supabase.co/functions/v1";
+  "https://api.opedd.com";
 
 const BUYER_EMAIL = process.env.OPEDD_BUYER_EMAIL;
 const PAYMENT_METHOD_ID = process.env.OPEDD_PAYMENT_METHOD_ID;
@@ -225,7 +225,7 @@ if (API_KEY) {
 // ─── MCP Server ───────────────────────────────────────────────────────────────
 
 const server = new Server(
-  { name: "opedd-mcp", version: "0.1.0" },
+  { name: "opedd-mcp", version: "0.1.2" },
   { capabilities: { tools: {} } }
 );
 
