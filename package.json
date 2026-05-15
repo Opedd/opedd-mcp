@@ -1,7 +1,7 @@
 {
   "name": "opedd-mcp",
-  "version": "0.1.2",
-  "description": "MCP server for Opedd — discover, purchase, and verify content licenses from AI assistants",
+  "version": "0.2.0",
+  "description": "MCP server for Opedd — discover, purchase, verify, and audit content licenses from AI assistants. Covers Phase 11 buyer-side surfaces.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {

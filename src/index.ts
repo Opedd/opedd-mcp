@@ -17,7 +17,9 @@ const API_BASE =
 const BUYER_EMAIL = process.env.OPEDD_BUYER_EMAIL;
 const PAYMENT_METHOD_ID = process.env.OPEDD_PAYMENT_METHOD_ID;
 const API_KEY = process.env.OPEDD_API_KEY; // publisher API key (op_...)
-const BUYER_TOKEN = process.env.OPEDD_BUYER_TOKEN; // buyer API token (bk_live_...)
+const BUYER_TOKEN = process.env.OPEDD_BUYER_TOKEN; // buyer API token (opedd_buyer_live_... or bk_live_...)
+const ACCESS_KEY = process.env.OPEDD_ACCESS_KEY; // enterprise access key (eak_*); for /enterprise-license GET feed
+const BUYER_JWT = process.env.OPEDD_BUYER_JWT; // Supabase JWT; for /buyer-audit + /buyer-compliance-report
 
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────
 
@@ -35,6 +37,46 @@ async function opeddFetch(path: string, options: RequestInit = {}): Promise<unkn
     throw new Error(msg);
   }
   return body;
+}
+
+// Fetch an NDJSON endpoint and collect parsed lines into an array.
+// Last line is typically `{"_meta": {...}}`; surfaced as `meta` field on the
+// returned object so the MCP tool result has both shape pieces inline.
+async function opeddFetchNdjson(
+  path: string,
+  options: RequestInit = {},
+): Promise<{ articles: unknown[]; meta: unknown }> {
+  const url = `${API_BASE}${path}`;
+  const headers: Record<string, string> = {
+    Accept: "application/x-ndjson",
+    ...(API_KEY ? { "X-API-Key": API_KEY } : {}),
+    ...(options.headers as Record<string, string> ?? {}),
+  };
+  const res = await fetch(url, { ...options, headers });
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try {
+      const errBody = await res.json();
+      msg = (errBody as any)?.error || (errBody as any)?.message || msg;
+    } catch {
+      // non-JSON error body — keep the HTTP-status default
+    }
+    throw new Error(msg);
+  }
+  const text = await res.text();
+  const articles: unknown[] = [];
+  let meta: unknown = null;
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const row = JSON.parse(line) as { _meta?: unknown };
+    if (row._meta !== undefined) {
+      meta = row._meta;
+    } else {
+      articles.push(row);
+    }
+  }
+  return { articles, meta };
 }
 
 // ─── MCP response helpers ─────────────────────────────────────────────────────
@@ -165,6 +207,62 @@ const TOOLS: Tool[] = [
       },
     },
   },
+  // ─── Phase 10 + 11 buyer-side surfaces (M6.4) ─────────────────────────────
+  {
+    name: "purchase_enterprise_license",
+    description:
+      "Purchase a bulk enterprise license covering multiple publishers (Phase 10). " +
+      "Returns a Stripe client_secret for payment completion + the enterprise_license_id. " +
+      "After payment, an eak_* access key is emailed to buyer_email. " +
+      "Scopes: 'custom' (pass-through publisher_ids), 'platform_wide' (auto-resolve all opted-in publishers), 'filtered' (Phase 10 filter_rules). " +
+      "License tiers: 'rag' (= ai_retrieval), 'training' (= ai_training, flat-fee not metered), 'inference' (= ai_retrieval), 'full_ai' (writes both retrieval + training records).",
+    inputSchema: {
+      type: "object",
+      required: ["publisher_ids", "buyer_email", "buyer_org"],
+      properties: {
+        publisher_ids: {
+          type: "array",
+          items: { type: "string" },
+          description: "Array of publisher UUIDs. Required for scope='custom'; ignored for platform_wide/filtered (resolved server-side).",
+        },
+        buyer_email: {
+          type: "string",
+          description: "Email to deliver the access key after payment",
+        },
+        buyer_org: {
+          type: "string",
+          description: "Buyer organization name (for billing + audit ledger)",
+        },
+        billing_type: {
+          type: "string",
+          enum: ["annual", "monthly", "annual_plus_monthly"],
+          description: "Billing cadence (default: annual)",
+        },
+        license_tier: {
+          type: "string",
+          enum: ["rag", "training", "inference", "full_ai"],
+          description: "License tier (default: rag)",
+        },
+        duration_months: {
+          type: "number",
+          description: "License duration in months (default: 12)",
+        },
+        scope: {
+          type: "string",
+          enum: ["custom", "platform_wide", "filtered"],
+          description: "Coverage scope (default: custom)",
+        },
+        filter_rules: {
+          type: "object",
+          description: "Required when scope='filtered'. See Phase 10 docs for shape: excluded_publisher_ids / direct_license_carveouts / categories / max_price_per_event.",
+        },
+        buyer_webhook_url: {
+          type: "string",
+          description: "Optional HMAC-signed webhook for content.published events on covered publishers",
+        },
+      },
+    },
+  },
 ];
 
 // If a buyer token is configured, expose content delivery tooling
@@ -172,10 +270,13 @@ if (BUYER_TOKEN) {
   TOOLS.push({
     name: "get_content",
     description:
-      "Retrieve the full body of a licensed article using a buyer API token (bk_live_...). " +
+      "Retrieve the full body of a licensed article using a buyer API token (opedd_buyer_live_* canonical post-5.2.1a; bk_live_* legacy). " +
       "Requires OPEDD_BUYER_TOKEN env var (create one at opedd.com/licenses after purchasing). " +
       "Works for per-article licenses (token scoped to that article) and archive licenses (token covers all publisher content). " +
-      "The publisher must have content delivery enabled and must have pushed content for the article.",
+      "The publisher must have content delivery enabled and must have pushed content for the article. " +
+      "Phase 11 M2 RAG-extended shape: response includes 7 RAG-essential metadata fields — author, language, word_count, content_hash, image_urls, canonical_url, tags. " +
+      "On pre-2026-05-14 historical articles, optional fields (author/language/image_urls/canonical_url/tags) may be NULL. " +
+      "NULL means 'data unavailable for this article', NOT 'explicitly empty' — treat as data-missing when filtering; do not interpret as anti-match.",
     inputSchema: {
       type: "object",
       required: ["article_id"],
@@ -186,7 +287,135 @@ if (BUYER_TOKEN) {
         },
         buyer_token: {
           type: "string",
-          description: "Buyer API token (bk_live_...). Falls back to OPEDD_BUYER_TOKEN env var.",
+          description: "Buyer API token (opedd_buyer_live_* or bk_live_*). Falls back to OPEDD_BUYER_TOKEN env var.",
+        },
+      },
+    },
+  });
+}
+
+// If an enterprise access key is configured, expose feed tools
+if (ACCESS_KEY) {
+  TOOLS.push({
+    name: "list_feed",
+    description:
+      "List articles from a buyer's licensed catalog via GET /enterprise-license (Phase 10 + 11). " +
+      "Returns JSON-format response with paginated articles. " +
+      "Use `since` (ISO 8601) for delta-feed polling — only articles published after the timestamp. " +
+      "Use `cursor` for pagination across pages. " +
+      "Requires OPEDD_ACCESS_KEY (eak_* enterprise access key). " +
+      "For larger bulk corpus pulls, use stream_feed_ndjson (up to 1000 articles per call vs 200 here).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        since: {
+          type: "string",
+          description: "ISO 8601 timestamp — return only articles with published_at > since",
+        },
+        cursor: {
+          type: "string",
+          description: "Opaque cursor from prior response's _meta.next_cursor",
+        },
+        limit: {
+          type: "number",
+          description: "Max articles per response (default: 50, max: 200)",
+        },
+      },
+    },
+  });
+  TOOLS.push({
+    name: "stream_feed_ndjson",
+    description:
+      "Bulk-export a buyer's licensed catalog via GET /enterprise-license?format=ndjson (Phase 11 M3). " +
+      "Returns up to 1000 articles per call (collected from line-delimited JSON wire format). " +
+      "Each article emits one usage_records row (analytics-only sentinel 'bulk-export:<request_id>:<article_id>' — not metered-billable per the revenue-model bifurcation invariant). " +
+      "Use `since` (ISO 8601) for delta-feed. Use `cursor` to paginate beyond 1000. " +
+      "Backend supports 5000 articles per call; the MCP cap is 1000 for transport reasonability. " +
+      "Real bulk-ingest pipelines should use the Python SDK (pip install opedd) directly — not via MCP. " +
+      "Requires OPEDD_ACCESS_KEY (eak_*).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        since: {
+          type: "string",
+          description: "ISO 8601 timestamp — return only articles with published_at > since",
+        },
+        cursor: {
+          type: "string",
+          description: "Opaque cursor from prior response's _meta.next_cursor",
+        },
+        limit: {
+          type: "number",
+          description: "Max articles per response (default: 200, max: 1000)",
+        },
+      },
+    },
+  });
+}
+
+// If a Supabase buyer JWT is configured, expose audit + compliance tools
+if (BUYER_JWT) {
+  TOOLS.push({
+    name: "get_audit_events",
+    description:
+      "Browse per-event audit rows for the authenticated buyer via GET /buyer-audit (Phase 9.x). " +
+      "Each row carries license_terms + Tempo on-chain attestation (merkle_root + inclusion_proof when blockchain_status='confirmed'). " +
+      "Optional filter by event_type ('content_access', 'bulk_content_access', 'compliance_report_generated'). " +
+      "Window cap 30 days (vs 90-day cap on get_compliance_dossier). " +
+      "Attestation inclusion proof is included on every row by default — no separate flag needed (M6.4 consolidation per founder ratification: tools 4 + 6 merged into one cleaner mental model). " +
+      "Requires OPEDD_BUYER_JWT (Supabase session JWT from the buyer portal).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        from: {
+          type: "string",
+          description: "ISO 8601 timestamp lower bound (inclusive)",
+        },
+        to: {
+          type: "string",
+          description: "ISO 8601 timestamp upper bound (inclusive)",
+        },
+        event_type: {
+          type: "string",
+          enum: ["content_access", "bulk_content_access", "compliance_report_generated"],
+          description: "Optional event-class filter",
+        },
+        cursor: {
+          type: "string",
+          description: "Opaque cursor for pagination",
+        },
+        limit: {
+          type: "number",
+          description: "Max events per response (default: 50, max: 200)",
+        },
+      },
+    },
+  });
+  TOOLS.push({
+    name: "get_compliance_dossier",
+    description:
+      "Generate a procurement-defense compliance dossier via GET /buyer-compliance-report (Phase 11 M4). " +
+      "Per-row dossier shape: 25+ fields including 17 RAG-essential article fields + full license_terms + on_chain_attestation block. " +
+      "Bulk envelopes fan out into per-article rows by iterating metadata.article_ids[]. " +
+      "Self-audit invariant: every successful call writes one license_events row with event_type='compliance_report_generated' BEFORE returning. " +
+      "Window cap: 90 days per call (vs 30-day cap on get_audit_events). For annual audits, paginate via _meta.next_cursor across 4 quarterly windows. " +
+      "Compliance framework anchors (boolean flags) map to EU AI Act Article 53, CDSM Article 4(3), on-chain attestation, TDM reservation. " +
+      "Requires OPEDD_BUYER_JWT.",
+    inputSchema: {
+      type: "object",
+      required: ["from", "to"],
+      properties: {
+        from: {
+          type: "string",
+          description: "ISO 8601 timestamp lower bound (inclusive)",
+        },
+        to: {
+          type: "string",
+          description: "ISO 8601 timestamp upper bound (inclusive). Window cap 90 days.",
+        },
+        cursor: {
+          type: "string",
+          description: "Opaque cursor for pagination",
         },
       },
     },
@@ -225,7 +454,7 @@ if (API_KEY) {
 // ─── MCP Server ───────────────────────────────────────────────────────────────
 
 const server = new Server(
-  { name: "opedd-mcp", version: "0.1.2" },
+  { name: "opedd-mcp", version: "0.2.0" },
   { capabilities: { tools: {} } }
 );
 
@@ -351,6 +580,153 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           `/content-delivery?article_id=${encodeURIComponent(article_id)}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
+        return ok(data);
+      }
+
+      // ── purchase_enterprise_license (Phase 10) ─────────────────────────────
+      case "purchase_enterprise_license": {
+        const {
+          publisher_ids,
+          buyer_email: pelEmail,
+          buyer_org,
+          billing_type = "annual",
+          license_tier = "rag",
+          duration_months = 12,
+          scope = "custom",
+          filter_rules,
+          buyer_webhook_url,
+        } = args as {
+          publisher_ids?: string[];
+          buyer_email?: string;
+          buyer_org?: string;
+          billing_type?: string;
+          license_tier?: string;
+          duration_months?: number;
+          scope?: string;
+          filter_rules?: Record<string, unknown>;
+          buyer_webhook_url?: string;
+        };
+
+        if (!Array.isArray(publisher_ids) || publisher_ids.length === 0) {
+          if (scope === "custom") {
+            return err("publisher_ids array is required for scope='custom'");
+          }
+        }
+        if (!pelEmail) return err("buyer_email is required");
+        if (!buyer_org) return err("buyer_org is required");
+
+        const body: Record<string, unknown> = {
+          publisher_ids: publisher_ids ?? [],
+          buyer_email: pelEmail,
+          buyer_org,
+          billing_type,
+          license_tier,
+          duration_months,
+          scope,
+          ...(filter_rules ? { filter_rules } : {}),
+          ...(buyer_webhook_url ? { buyer_webhook_url } : {}),
+        };
+
+        const data = await opeddFetch("/enterprise-license", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+        return ok(data);
+      }
+
+      // ── list_feed (Phase 10 + 11) ──────────────────────────────────────────
+      case "list_feed": {
+        if (!ACCESS_KEY) {
+          return err("OPEDD_ACCESS_KEY env var is required for this tool (eak_* enterprise access key)");
+        }
+        const { since, cursor, limit = 50 } = args as {
+          since?: string;
+          cursor?: string;
+          limit?: number;
+        };
+        const params = new URLSearchParams({
+          access_key: ACCESS_KEY,
+          format: "json",
+          limit: String(Math.min(Number(limit) || 50, 200)),
+        });
+        if (since) params.set("since", since);
+        if (cursor) params.set("cursor", cursor);
+
+        const data = await opeddFetch(`/enterprise-license?${params.toString()}`);
+        return ok(data);
+      }
+
+      // ── stream_feed_ndjson (Phase 11 M3) ───────────────────────────────────
+      case "stream_feed_ndjson": {
+        if (!ACCESS_KEY) {
+          return err("OPEDD_ACCESS_KEY env var is required for this tool (eak_* enterprise access key)");
+        }
+        const { since, cursor, limit = 200 } = args as {
+          since?: string;
+          cursor?: string;
+          limit?: number;
+        };
+        const params = new URLSearchParams({
+          access_key: ACCESS_KEY,
+          format: "ndjson",
+          limit: String(Math.min(Number(limit) || 200, 1000)),
+        });
+        if (since) params.set("since", since);
+        if (cursor) params.set("cursor", cursor);
+
+        const data = await opeddFetchNdjson(`/enterprise-license?${params.toString()}`);
+        return ok(data);
+      }
+
+      // ── get_audit_events (Phase 9.x + 10 M5 attestation) ───────────────────
+      case "get_audit_events": {
+        if (!BUYER_JWT) {
+          return err("OPEDD_BUYER_JWT env var is required for this tool (Supabase session JWT)");
+        }
+        const { from, to, event_type, cursor, limit = 50 } = args as {
+          from?: string;
+          to?: string;
+          event_type?: string;
+          cursor?: string;
+          limit?: number;
+        };
+        const params = new URLSearchParams({
+          limit: String(Math.min(Number(limit) || 50, 200)),
+        });
+        if (from) params.set("from", from);
+        if (to) params.set("to", to);
+        if (event_type) params.set("event_type", event_type);
+        if (cursor) params.set("cursor", cursor);
+
+        const data = await opeddFetch(`/buyer-audit?${params.toString()}`, {
+          headers: { Authorization: `Bearer ${BUYER_JWT}` },
+        });
+        return ok(data);
+      }
+
+      // ── get_compliance_dossier (Phase 11 M4) ───────────────────────────────
+      case "get_compliance_dossier": {
+        if (!BUYER_JWT) {
+          return err("OPEDD_BUYER_JWT env var is required for this tool (Supabase session JWT)");
+        }
+        const { from, to, cursor } = args as {
+          from?: string;
+          to?: string;
+          cursor?: string;
+        };
+        if (!from) return err("from (ISO 8601 timestamp) is required");
+        if (!to) return err("to (ISO 8601 timestamp) is required");
+
+        const params = new URLSearchParams({
+          from,
+          to,
+          format: "json",
+        });
+        if (cursor) params.set("cursor", cursor);
+
+        const data = await opeddFetch(`/buyer-compliance-report?${params.toString()}`, {
+          headers: { Authorization: `Bearer ${BUYER_JWT}` },
+        });
         return ok(data);
       }
 
