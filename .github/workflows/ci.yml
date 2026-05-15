@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["18", "20", "22"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript compile
+        run: npm run build
+
+      - name: Verify dist/index.js produced
+        run: |
+          test -f dist/index.js || (echo "::error::dist/index.js not produced by tsc"; exit 1)
+          echo "dist/index.js bytes: $(wc -c < dist/index.js)"
+
+      - name: Smoke-boot the MCP server
+        run: |
+          # Send initialize + tools/list, confirm v0.2.0 boots and lists tools
+          printf '%s\n%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+            | timeout 10 node dist/index.js > /tmp/mcp-output.txt 2> /tmp/mcp-stderr.txt || true
+          if ! grep -q '"serverInfo":{"name":"opedd-mcp"' /tmp/mcp-output.txt; then
+            echo "::error::MCP server did not respond with expected serverInfo"
+            cat /tmp/mcp-output.txt
+            cat /tmp/mcp-stderr.txt
+            exit 1
+          fi
+          if ! grep -q '"name":"lookup_content"' /tmp/mcp-output.txt; then
+            echo "::error::MCP server did not list lookup_content tool"
+            exit 1
+          fi
+          echo "MCP smoke boot OK"
