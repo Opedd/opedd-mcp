@@ -1,6 +1,10 @@
 # opedd-mcp
 
-An [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server for the [Opedd](https://opedd.com) licensing protocol. Lets AI assistants (Claude Desktop, Cursor, Windsurf, or any MCP-compatible host) discover, purchase, and verify content licenses autonomously — mid-conversation, without opening a browser.
+Licensed content retrieval for AI agents via [MCP (Model Context Protocol)](https://modelcontextprotocol.io). The alternative to unlicensed web scraping for RAG pipelines, AI search, and LLM grounding.
+
+Lets AI assistants (Claude Desktop, Cursor, Windsurf, or any MCP-compatible host) discover, purchase, and verify content licenses autonomously — mid-conversation, without opening a browser. Every license is registered on-chain (Tempo blockchain) with cryptographic proof.
+
+**Unlike generic search APIs**, Opedd returns content with a verifiable license key — defensible under the EU AI Act and any copyright jurisdiction.
 
 ## What it does
 
@@ -132,6 +136,28 @@ npm install
 npm run dev   # runs with tsx (no build step)
 npm run build # compiles to dist/
 ```
+
+## How Opedd compares to search APIs
+
+| | Opedd | Generic search APIs |
+|---|---|---|
+| **What you get** | Licensed content + license key + on-chain proof — all in one API call | Scraped web content, no rights |
+| **Content delivery** | Full article text delivered via API (JSON), real-time feed via webhooks | Scraped snippets or full-page dumps |
+| **Content quality** | Curated publisher content (niche B2B newsletters, expert analysis) | Whatever's on the open web |
+| **Rights** | Verifiable license key per article, publisher-authorized | No rights clearance |
+| **Proof** | On-chain (Tempo blockchain) — independently verifiable | None |
+| **EU AI Act** | Compliant — full training data provenance chain | No provenance |
+| **Pricing** | Publisher sets their own price per article | Platform decides |
+| **Delivery modes** | Per-article API, bulk feed (JSON firehose), buyer webhooks (push) | Query-response only |
+| **Protocol** | REST + MCP native | REST only |
+
+Opedd is the **licensed content delivery layer** for AI — not just a licensing wrapper. Publishers upload content, you retrieve it via API with a license attached. One integration gives your pipeline both the content and the legal right to use it.
+
+## Learn more
+
+- [Opedd for AI Agents](https://opedd.com/for-ai-agents) — full documentation, code examples, endpoint reference
+- [API Docs](https://docs.opedd.com) — OpenAPI spec with agent endpoints
+- [Opedd Registry](https://opedd.com/registry) — browse on-chain license proofs
 
 ## License
 
