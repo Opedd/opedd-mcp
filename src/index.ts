@@ -17,8 +17,8 @@ const API_BASE =
 const BUYER_EMAIL = process.env.OPEDD_BUYER_EMAIL;
 const PAYMENT_METHOD_ID = process.env.OPEDD_PAYMENT_METHOD_ID;
 const API_KEY = process.env.OPEDD_API_KEY; // publisher API key (op_...)
-const BUYER_TOKEN = process.env.OPEDD_BUYER_TOKEN; // buyer API token (opedd_buyer_live_... or bk_live_...)
-const ACCESS_KEY = process.env.OPEDD_ACCESS_KEY; // enterprise access key (eak_*); for /enterprise-license GET feed
+const BUYER_TOKEN = process.env.OPEDD_BUYER_TOKEN; // buyer API token (opedd_buyer_live_... or opedd_buyer_test_...)
+const ACCESS_KEY = process.env.OPEDD_ACCESS_KEY; // enterprise access key (ent_*); for /enterprise-license GET feed
 const BUYER_JWT = process.env.OPEDD_BUYER_JWT; // Supabase JWT; for /buyer-audit + /buyer-compliance-report
 
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────
@@ -213,7 +213,7 @@ const TOOLS: Tool[] = [
     description:
       "Purchase a bulk enterprise license covering multiple publishers (Phase 10). " +
       "Returns a Stripe client_secret for payment completion + the enterprise_license_id. " +
-      "After payment, an eak_* access key is emailed to buyer_email. " +
+      "After payment, an ent_* access key is emailed to buyer_email. " +
       "Scopes: 'custom' (pass-through publisher_ids), 'platform_wide' (auto-resolve all opted-in publishers), 'filtered' (Phase 10 filter_rules). " +
       "License tiers: 'rag' (= ai_retrieval), 'training' (= ai_training, flat-fee not metered), 'inference' (= ai_retrieval), 'full_ai' (writes both retrieval + training records).",
     inputSchema: {
@@ -270,7 +270,7 @@ if (BUYER_TOKEN) {
   TOOLS.push({
     name: "get_content",
     description:
-      "Retrieve the full body of a licensed article using a buyer API token (opedd_buyer_live_* canonical post-5.2.1a; bk_live_* legacy). " +
+      "Retrieve the full body of a licensed article using a buyer API token (opedd_buyer_live_* canonical; opedd_buyer_test_* for sandbox). " +
       "Requires OPEDD_BUYER_TOKEN env var (create one at opedd.com/licenses after purchasing). " +
       "Works for per-article licenses (token scoped to that article) and archive licenses (token covers all publisher content). " +
       "The publisher must have content delivery enabled and must have pushed content for the article. " +
@@ -287,7 +287,7 @@ if (BUYER_TOKEN) {
         },
         buyer_token: {
           type: "string",
-          description: "Buyer API token (opedd_buyer_live_* or bk_live_*). Falls back to OPEDD_BUYER_TOKEN env var.",
+          description: "Buyer API token (opedd_buyer_live_* or opedd_buyer_test_*). Falls back to OPEDD_BUYER_TOKEN env var.",
         },
       },
     },
@@ -303,7 +303,7 @@ if (ACCESS_KEY) {
       "Returns JSON-format response with paginated articles. " +
       "Use `since` (ISO 8601) for delta-feed polling — only articles published after the timestamp. " +
       "Use `cursor` for pagination across pages. " +
-      "Requires OPEDD_ACCESS_KEY (eak_* enterprise access key). " +
+      "Requires OPEDD_ACCESS_KEY (ent_* enterprise access key). " +
       "For larger bulk corpus pulls, use stream_feed_ndjson (up to 1000 articles per call vs 200 here).",
     inputSchema: {
       type: "object",
@@ -332,7 +332,7 @@ if (ACCESS_KEY) {
       "Use `since` (ISO 8601) for delta-feed. Use `cursor` to paginate beyond 1000. " +
       "Backend supports 5000 articles per call; the MCP cap is 1000 for transport reasonability. " +
       "Real bulk-ingest pipelines should use the Python SDK (pip install opedd) directly — not via MCP. " +
-      "Requires OPEDD_ACCESS_KEY (eak_*).",
+      "Requires OPEDD_ACCESS_KEY (ent_*).",
     inputSchema: {
       type: "object",
       properties: {
@@ -637,7 +637,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // ── list_feed (Phase 10 + 11) ──────────────────────────────────────────
       case "list_feed": {
         if (!ACCESS_KEY) {
-          return err("OPEDD_ACCESS_KEY env var is required for this tool (eak_* enterprise access key)");
+          return err("OPEDD_ACCESS_KEY env var is required for this tool (ent_* enterprise access key)");
         }
         const { since, cursor, limit = 50 } = args as {
           since?: string;
@@ -659,7 +659,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // ── stream_feed_ndjson (Phase 11 M3) ───────────────────────────────────
       case "stream_feed_ndjson": {
         if (!ACCESS_KEY) {
-          return err("OPEDD_ACCESS_KEY env var is required for this tool (eak_* enterprise access key)");
+          return err("OPEDD_ACCESS_KEY env var is required for this tool (ent_* enterprise access key)");
         }
         const { since, cursor, limit = 200 } = args as {
           since?: string;

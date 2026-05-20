@@ -26,7 +26,7 @@ Exposes up to 11 tools to any AI assistant (some are conditional on env vars):
 |------|-------------|
 | `get_content` | Retrieve a licensed article — includes 7 Phase 11 M2 RAG metadata fields (author, language, word_count, content_hash, image_urls, canonical_url, tags) |
 
-**Requires `OPEDD_ACCESS_KEY` (eak_*) — buyer-side feed surfaces**
+**Requires `OPEDD_ACCESS_KEY` (ent_*) — buyer-side feed surfaces**
 
 | Tool | Description |
 |------|-------------|
@@ -66,8 +66,8 @@ Set environment variables to pre-configure the server:
 |----------|----------|-------------|
 | `OPEDD_BUYER_EMAIL` | Recommended | Your email — used as default for all purchases |
 | `OPEDD_PAYMENT_METHOD_ID` | Recommended | Stripe `pm_...` ID — used for autonomous per-article purchasing |
-| `OPEDD_BUYER_TOKEN` | Optional | Buyer API token (`opedd_buyer_live_*` canonical post-5.2.1a; `bk_live_*` legacy) — enables `get_content` |
-| `OPEDD_ACCESS_KEY` | Optional | Enterprise access key (`eak_*`) — enables `list_feed` + `stream_feed_ndjson` |
+| `OPEDD_BUYER_TOKEN` | Optional | Buyer API token (`opedd_buyer_live_*` canonical; `opedd_buyer_test_*` for sandbox) — enables `get_content` |
+| `OPEDD_ACCESS_KEY` | Optional | Enterprise access key (`ent_*`) — enables `list_feed` + `stream_feed_ndjson` |
 | `OPEDD_BUYER_JWT` | Optional | Supabase session JWT from the buyer portal — enables `get_audit_events` + `get_compliance_dossier` |
 | `OPEDD_API_KEY` | Optional | Publisher API key (`op_...`) — enables `list_publisher_content` |
 | `OPEDD_API_URL` | Optional | Override the API base URL (default: Opedd production) |
