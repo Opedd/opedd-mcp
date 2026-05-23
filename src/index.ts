@@ -207,6 +207,38 @@ const TOOLS: Tool[] = [
       },
     },
   },
+  // ─── Phase 12 Wave 1 W1.1 — public RSL Standard manifest ─────────────────
+  {
+    name: "rsl_get",
+    description:
+      "Fetch a publisher's RSL Standard manifest via GET /rsl-manifest (Phase 12 Wave 1 W1.1). " +
+      "Public no-auth endpoint — discovery surface for AI agents/crawlers wanting to know what's licensable " +
+      "from a publisher BEFORE going through the buyer-account signup flow. " +
+      "Returns the 4 canonical license types (ai_retrieval, ai_training, human_per_article, human_full_archive) " +
+      "the publisher has opted into, plus the EU CDSM Article 4(3) opt-out posture (`tdm_reservation`). " +
+      "Set `jsonld: true` to request the JSON-LD shape with embedded HMAC-SHA256 signed receipt over the " +
+      "CDSM Article 4(3) reservation state + `tdm:reservationSignedAt` timestamp — regulators can post-hoc " +
+      "verify the reservation was the claimed value at the claimed time. Default `jsonld: false` returns " +
+      "the raw RSL Standard JSON manifest. " +
+      "Per INVARIANTS.md W1.6: this is the PUBLISHER-side CDSM Article 4(3) declaration surface. It is NOT " +
+      "an EU AI Act Article 53 attestation (which is buyer-side, JWT-auth, via article_53_attestation tool).",
+    inputSchema: {
+      type: "object",
+      required: ["publisher_id"],
+      properties: {
+        publisher_id: {
+          type: "string",
+          description: "UUID of the publisher whose RSL manifest to fetch. Publisher must be verified.",
+        },
+        jsonld: {
+          type: "boolean",
+          description:
+            "If true, request JSON-LD shape (Accept: application/ld+json) with embedded HMAC-SHA256 signed receipt. " +
+            "Default false returns raw RSL Standard JSON shape.",
+        },
+      },
+    },
+  },
   // ─── Phase 10 + 11 buyer-side surfaces (M6.4) ─────────────────────────────
   {
     name: "purchase_enterprise_license",
@@ -579,6 +611,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const data = await opeddFetch(
           `/content-delivery?article_id=${encodeURIComponent(article_id)}`,
           { headers: { Authorization: `Bearer ${token}` } }
+        );
+        return ok(data);
+      }
+
+      // ── rsl_get (Phase 12 Wave 1 W1.1) ─────────────────────────────────────
+      case "rsl_get": {
+        const { publisher_id, jsonld = false } = args as {
+          publisher_id: string;
+          jsonld?: boolean;
+        };
+        if (!publisher_id) return err("publisher_id is required");
+
+        const accept = jsonld ? "application/ld+json" : "application/json";
+        const data = await opeddFetch(
+          `/rsl-manifest?publisher_id=${encodeURIComponent(publisher_id)}`,
+          { headers: { Accept: accept } },
         );
         return ok(data);
       }
