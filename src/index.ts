@@ -207,6 +207,43 @@ const TOOLS: Tool[] = [
       },
     },
   },
+  // ─── Public buyer-discovery — catalog browse ──────────────────────────────
+  {
+    name: "publisher_directory",
+    description:
+      "Browse the public Opedd publisher catalog via GET /publisher-directory. " +
+      "Returns paginated publishers with article counts, pricing (per-article + annual + monthly-forward-feed), " +
+      "plan, and sample articles (RAG-extended metadata). " +
+      "**The primary discovery surface for AI labs to find Opedd-licensable publishers** — distinct from " +
+      "`browse_registry` (which lists issued LICENSES, not publishers). " +
+      "Filter by category (case-insensitive substring), min_articles, or verified status. " +
+      "Public no-auth — useful pre-purchase scoping before buyers commit to enterprise-license POST.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        category: {
+          type: "string",
+          description: "Case-insensitive substring filter on publisher category (e.g. 'finance', 'AI').",
+        },
+        min_articles: {
+          type: "number",
+          description: "Filter to publishers with at least this many licensable articles.",
+        },
+        verified: {
+          type: "string",
+          description: "'true' to show only verified publishers (default), 'false' for unverified.",
+        },
+        limit: {
+          type: "number",
+          description: "Page size cap.",
+        },
+        offset: {
+          type: "number",
+          description: "Pagination offset.",
+        },
+      },
+    },
+  },
   // ─── Phase 12 Wave 3 W3.1 — onboarding helpers ────────────────────────────
   {
     name: "detect_platform",
@@ -673,6 +710,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           `/content-delivery?article_id=${encodeURIComponent(article_id)}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
+        return ok(data);
+      }
+
+      // ── publisher_directory (buyer-discovery catalog browse) ───────────────
+      case "publisher_directory": {
+        const { category, min_articles, verified, limit, offset } = args as {
+          category?: string;
+          min_articles?: number;
+          verified?: string;
+          limit?: number;
+          offset?: number;
+        };
+        const params = new URLSearchParams();
+        if (category) params.set("category", category);
+        if (min_articles !== undefined) params.set("min_articles", String(min_articles));
+        if (verified !== undefined) params.set("verified", verified);
+        if (limit !== undefined) params.set("limit", String(limit));
+        if (offset !== undefined) params.set("offset", String(offset));
+
+        const query = params.toString();
+        const data = await opeddFetch(`/publisher-directory${query ? `?${query}` : ""}`);
         return ok(data);
       }
 
