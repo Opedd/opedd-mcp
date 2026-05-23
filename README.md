@@ -134,6 +134,16 @@ Once configured, you can ask your AI assistant:
 
 > "Browse the latest licenses from The Information publisher."
 
+### Phase 12 Wave 1 + 3 surfaces (v0.3.0)
+
+> "What does publisher 8268c353-ffa3-4db3-bbb2-90ddbbb43e41 license? Pull the RSL manifest." — uses `rsl_get`
+
+> "Get me a CDSM Article 4(3) signed receipt for that publisher's reservation state — set `jsonld: true`." — uses `rsl_get` with content negotiation
+
+> "Generate an EU AI Act Article 53 attestation JWT for our license `11111111-...` covering the last 90 days. I need the artifact for our procurement audit committee." — uses `article_53_attestation` (requires `OPEDD_BUYER_JWT`)
+
+> "This publisher just signed up: `https://noahpinion.substack.com`. Which onboarding workflow should we use?" — uses `detect_platform`
+
 The assistant will call the appropriate Opedd tools, show you the results, and—if you've pre-configured a payment method—can complete a purchase autonomously.
 
 ## Payment methods
