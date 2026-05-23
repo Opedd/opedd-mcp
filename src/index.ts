@@ -485,6 +485,22 @@ if (BUYER_JWT) {
     },
   });
   TOOLS.push({
+    name: "get_buyer_account",
+    description:
+      "Fetch the authenticated buyer's account profile + masked API key list via GET /buyer-account. " +
+      "Returns the enterprise_buyers row (contact_email, buyer_org, created_at, etc.) plus a list of all " +
+      "buyer-side API keys with masked prefixes (NEVER plaintext post-issuance — only the 12-char " +
+      "key_prefix is returned, e.g. 'opedd_buyer_'). " +
+      "Use cases: post-signup verification ('what was just issued to me?'), buyer dashboard mental model " +
+      "('what licenses do I currently hold?'), audit prep ('show me the key list before rotation'). " +
+      "For full mid-lifecycle license details (filter_rules, billing, payouts), buyers consult the buyer portal at opedd.com/buyer. " +
+      "Requires OPEDD_BUYER_JWT.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  });
+  TOOLS.push({
     name: "article_53_attestation",
     description:
       "Issue a signed JWT attesting to EU AI Act Article 53 compliance for a specific license via " +
@@ -878,6 +894,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (cursor) params.set("cursor", cursor);
 
         const data = await opeddFetch(`/buyer-audit?${params.toString()}`, {
+          headers: { Authorization: `Bearer ${BUYER_JWT}` },
+        });
+        return ok(data);
+      }
+
+      // ── get_buyer_account (buyer profile + masked key list) ────────────────
+      case "get_buyer_account": {
+        if (!BUYER_JWT) {
+          return err("OPEDD_BUYER_JWT env var is required for this tool (Supabase session JWT)");
+        }
+        const data = await opeddFetch("/buyer-account", {
           headers: { Authorization: `Bearer ${BUYER_JWT}` },
         });
         return ok(data);
