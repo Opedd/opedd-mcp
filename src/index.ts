@@ -207,6 +207,30 @@ const TOOLS: Tool[] = [
       },
     },
   },
+  // ─── Phase 12 Wave 3 W3.1 — onboarding helpers ────────────────────────────
+  {
+    name: "detect_platform",
+    description:
+      "Detect the content platform behind a URL via POST /detect-platform (Phase 12 Wave 3 W3.1). " +
+      "Public no-auth lookup. Given a URL, identifies what platform powers it " +
+      "(Substack / Beehiiv / Ghost / Medium / Brevo / custom) and returns the suggested onboarding workflow. " +
+      "Hostname-detectable platforms (Substack subdomain, Beehiiv suffix, etc.) resolve in milliseconds; " +
+      "custom domains may take ~few seconds while the detector probes well-known platform endpoints in parallel. " +
+      "Returns: {platform, confidence, archive_method, forward_method, required_credentials, instructions}. " +
+      "The archive_method + forward_method fields are the two onboarding-workflow inputs Opedd's setup wizard reads " +
+      "(one for historical content backfill, one for new-content forward stream). " +
+      "instructions is human-readable operator copy explaining the inferred path.",
+    inputSchema: {
+      type: "object",
+      required: ["url"],
+      properties: {
+        url: {
+          type: "string",
+          description: "Publisher URL to inspect (any well-formed URL works; hostname-match short-circuits the probe path).",
+        },
+      },
+    },
+  },
   // ─── Phase 12 Wave 1 W1.1 — public RSL Standard manifest ─────────────────
   {
     name: "rsl_get",
@@ -649,6 +673,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           `/content-delivery?article_id=${encodeURIComponent(article_id)}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
+        return ok(data);
+      }
+
+      // ── detect_platform (Phase 12 Wave 3 W3.1) ─────────────────────────────
+      case "detect_platform": {
+        const { url } = args as { url: string };
+        if (!url) return err("url is required");
+
+        const data = await opeddFetch("/detect-platform", {
+          method: "POST",
+          body: JSON.stringify({ url }),
+        });
         return ok(data);
       }
 
