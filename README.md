@@ -146,6 +146,10 @@ Once configured, you can ask your AI assistant:
 
 > "This publisher just signed up: `https://noahpinion.substack.com`. Which onboarding workflow should we use?" — uses `detect_platform`
 
+> "Browse the finance category in the Opedd catalog — show me publishers with at least 50 articles." — uses `publisher_directory`
+
+> "What's in my buyer account? Show me my active API keys." — uses `get_buyer_account` (requires `OPEDD_BUYER_JWT`)
+
 The assistant will call the appropriate Opedd tools, show you the results, and—if you've pre-configured a payment method—can complete a purchase autonomously.
 
 ## Payment methods
