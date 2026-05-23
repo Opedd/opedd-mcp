@@ -8,9 +8,9 @@ Lets AI assistants (Claude Desktop, Cursor, Windsurf, or any MCP-compatible host
 
 ## What it does
 
-Exposes up to 11 tools to any AI assistant (some are conditional on env vars):
+Exposes up to 14 tools to any AI assistant (some are conditional on env vars):
 
-**Always available — discovery + per-article purchase**
+**Always available — discovery + per-article purchase + onboarding + rights signaling**
 
 | Tool | Description |
 |------|-------------|
@@ -19,6 +19,8 @@ Exposes up to 11 tools to any AI assistant (some are conditional on env vars):
 | `verify_license` | Verify a license key — returns validity, article, publisher, blockchain proof |
 | `browse_registry` | Browse the public Opedd registry (global or by publisher) |
 | `purchase_enterprise_license` | Buy a bulk enterprise license covering multiple publishers (Phase 10) — returns Stripe `client_secret` |
+| `rsl_get` | Fetch a publisher's RSL Standard manifest — public discovery surface; `jsonld: true` returns CDSM Article 4(3) signed receipt (Phase 12 W1.1) |
+| `detect_platform` | Detect the content platform behind a URL — returns suggested onboarding workflow for Substack / Beehiiv / Ghost / Medium / Brevo / custom (Phase 12 W3.1) |
 
 **Requires `OPEDD_BUYER_TOKEN` (opedd_buyer_live_*)**
 
@@ -33,18 +35,29 @@ Exposes up to 11 tools to any AI assistant (some are conditional on env vars):
 | `list_feed` | List articles from a buyer's licensed catalog with `since` delta-feed support (Phase 11 M5) |
 | `stream_feed_ndjson` | Bulk-export up to 1000 articles per call via NDJSON wire format (Phase 11 M3) |
 
-**Requires `OPEDD_BUYER_JWT` (Supabase JWT) — audit + compliance surfaces**
+**Requires `OPEDD_BUYER_JWT` (Supabase JWT) — audit + compliance + EU AI Act surfaces**
 
 | Tool | Description |
 |------|-------------|
 | `get_audit_events` | Per-event audit ledger with Tempo on-chain attestation inclusion proofs inline (Phase 9.x + 10 M5) |
 | `get_compliance_dossier` | Procurement-defense compliance dossier mapping retrievals to license terms (Phase 11 M4) |
+| `article_53_attestation` | Signed JWT attesting EU AI Act Article 53(1)(d) compliance for a license — the artifact AI labs hand to legal/procurement (Phase 12 W1.4) |
 
 **Requires `OPEDD_API_KEY` (op_*) — publisher-side**
 
 | Tool | Description |
 |------|-------------|
 | `list_publisher_content` | List your own articles with pricing and stats |
+
+### Regulatory framing (CDSM Article 4 vs EU AI Act Article 53 — never conflated)
+
+Per the [opedd-backend INVARIANTS.md W1.6 amendment](https://github.com/Opedd/opedd-backend/blob/main/INVARIANTS.md):
+
+- **`rsl_get(publisher_id, jsonld=true)`** → publisher-side **CDSM Article 4(3)** opt-out declaration (signed JSON-LD receipt over the reservation state).
+- **`article_53_attestation(license_id)`** → buyer-side **EU AI Act Article 53** attestation (signed HS256 JWT scoped to one license).
+- **`get_compliance_dossier(from, to)`** → comprehensive procurement-defense dossier covering BOTH frameworks (publisher CDSM reservation honored + buyer Article 53 evidence chain).
+
+These serve different audit-defensibility modes and never share wire format. Tool descriptions cite the W1.6 invariant inline.
 
 ## Install
 

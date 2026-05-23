@@ -547,7 +547,7 @@ if (API_KEY) {
 // ─── MCP Server ───────────────────────────────────────────────────────────────
 
 const server = new Server(
-  { name: "opedd-mcp", version: "0.2.0" },
+  { name: "opedd-mcp", version: "0.3.0" },
   { capabilities: { tools: {} } }
 );
 
