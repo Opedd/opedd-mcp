@@ -424,6 +424,43 @@ if (BUYER_JWT) {
     },
   });
   TOOLS.push({
+    name: "article_53_attestation",
+    description:
+      "Issue a signed JWT attesting to EU AI Act Article 53 compliance for a specific license via " +
+      "GET /eu-ai-act/article-53-attestation (Phase 12 Wave 1 W1.4). " +
+      "Returns a freshly-signed HS256 JWT regulators can verify offline against the canonical signing key. " +
+      "Embeds: license context, usage-count over the attestation window, the most-recent Tempo Merkle root, " +
+      "and canonical claims (iss/sub/iat/exp/jti/aud). " +
+      "**The artifact AI labs hand to legal/procurement for EU AI Act Article 53(1)(d) transparency-obligation evidence.** " +
+      "Per INVARIANTS.md W1.6: this attests to EU AI Act Article 53 ONLY (buyer-side GPAI-model-provider " +
+      "transparency obligation). It does NOT discharge a publisher's CDSM Article 4(3) reservation obligation — " +
+      "that lives on the rsl_get tool (jsonld=true variant). Never conflate. " +
+      "Optional `content_id` scopes the attestation to one article; default is license-wide. " +
+      "Window cap: 365 days. Requires OPEDD_BUYER_JWT.",
+    inputSchema: {
+      type: "object",
+      required: ["license_id"],
+      properties: {
+        license_id: {
+          type: "string",
+          description: "UUID of the enterprise_license OR legacy individual license to attest. Buyer must own it.",
+        },
+        content_id: {
+          type: "string",
+          description: "Optional UUID of a specific article to scope the attestation. Default: license-wide.",
+        },
+        window_start: {
+          type: "string",
+          description: "ISO 8601 lower bound of the attestation window. Default: now - 90 days.",
+        },
+        window_end: {
+          type: "string",
+          description: "ISO 8601 upper bound. Default: now. Window may not exceed 365 days (hard cap).",
+        },
+      },
+    },
+  });
+  TOOLS.push({
     name: "get_compliance_dossier",
     description:
       "Generate a procurement-defense compliance dossier via GET /buyer-compliance-report (Phase 11 M4). " +
@@ -749,6 +786,31 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const data = await opeddFetch(`/buyer-audit?${params.toString()}`, {
           headers: { Authorization: `Bearer ${BUYER_JWT}` },
         });
+        return ok(data);
+      }
+
+      // ── article_53_attestation (Phase 12 Wave 1 W1.4) ──────────────────────
+      case "article_53_attestation": {
+        if (!BUYER_JWT) {
+          return err("OPEDD_BUYER_JWT env var is required for this tool (Supabase session JWT)");
+        }
+        const { license_id, content_id, window_start, window_end } = args as {
+          license_id: string;
+          content_id?: string;
+          window_start?: string;
+          window_end?: string;
+        };
+        if (!license_id) return err("license_id is required");
+
+        const params = new URLSearchParams({ license_id });
+        if (content_id) params.set("content_id", content_id);
+        if (window_start) params.set("window_start", window_start);
+        if (window_end) params.set("window_end", window_end);
+
+        const data = await opeddFetch(
+          `/eu-ai-act/article-53-attestation?${params.toString()}`,
+          { headers: { Authorization: `Bearer ${BUYER_JWT}` } },
+        );
         return ok(data);
       }
 
