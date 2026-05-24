@@ -12,7 +12,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ["18", "20", "22"]
+        # Node 18 dropped 2026-05-24 — vitest 4.x (rolldown dep) requires
+        # `node:util.styleText` which is only available on Node 21.7+.
+        # Node 18 reaches active LTS end April 2025; engines.node in
+        # package.json bumped to ">=20" in the same commit. Re-add Node 18
+        # only if vitest downgrade ratified (which is the alternative;
+        # founder picked engines bump).
+        node-version: ["20", "22"]
     steps:
       - uses: actions/checkout@v4
 
