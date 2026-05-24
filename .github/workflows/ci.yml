@@ -23,7 +23,15 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        # Using `npm install` rather than `npm ci` because the lockfile
+        # generated on macOS doesn't include Linux-conditional optional
+        # native deps (e.g. @emnapi/* used by vitest 4.x via napi-rs).
+        # `npm install` resolves transitively at install time per-platform;
+        # `npm ci` strictly validates lockfile-against-package.json and
+        # rejects when platform-specific transitive deps are missing.
+        # Trade-off: install is slower + slightly looser; acceptable for
+        # this repo's CI scale.
+        run: npm install
 
       - name: TypeScript compile
         run: npm run build
