@@ -28,6 +28,9 @@ jobs:
       - name: TypeScript compile
         run: npm run build
 
+      - name: Unit tests (vitest)
+        run: npm test
+
       - name: Verify dist/index.js produced
         run: |
           test -f dist/index.js || (echo "::error::dist/index.js not produced by tsc"; exit 1)

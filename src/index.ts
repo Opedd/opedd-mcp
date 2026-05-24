@@ -7,6 +7,7 @@ import {
   ListToolsRequestSchema,
   type Tool,
 } from "@modelcontextprotocol/sdk/types.js";
+import { pathToFileURL } from "node:url";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -94,7 +95,7 @@ function err(msg: string): ToolResult {
 
 // ─── Tool definitions ─────────────────────────────────────────────────────────
 
-const TOOLS: Tool[] = [
+export const TOOLS: Tool[] = [
   {
     name: "lookup_content",
     description:
@@ -606,9 +607,22 @@ const server = new Server(
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args = {} } = request.params;
+server.setRequestHandler(CallToolRequestSchema, async (request) =>
+  dispatchTool(request.params.name, (request.params.arguments ?? {}) as Record<string, unknown>),
+);
 
+// ─── Tool dispatcher (exported for unit tests) ────────────────────────────────
+//
+// Extracted from the inline handler 2026-05-24 EEST as part of the opedd-mcp
+// test cohort ship. Behavior-preserving: the server.setRequestHandler above
+// is a thin delegation to dispatchTool. Exporting allows unit tests to mock
+// global fetch + invoke each tool's handler directly without spawning a
+// stdio subprocess.
+
+export async function dispatchTool(
+  name: string,
+  args: Record<string, unknown>,
+): Promise<ToolResult> {
   try {
     switch (name) {
       // ── lookup_content ─────────────────────────────────────────────────────
@@ -989,10 +1003,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const msg = e instanceof Error ? e.message : String(e);
     return err(`Request failed: ${msg}`);
   }
-});
+}
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
-console.error("[opedd-mcp] Server running on stdio");
+// Skip stdio bootstrap when imported as a module (unit tests need TOOLS +
+// dispatchTool without the server.connect side-effect). Detect via
+// `import.meta.url === pathToFileURL(process.argv[1]).href` — the canonical
+// "am I the entry point" check for ESM Node modules.
+if (
+  typeof process !== "undefined" &&
+  process.argv?.[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error("[opedd-mcp] Server running on stdio");
+}
