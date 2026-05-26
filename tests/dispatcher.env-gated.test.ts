@@ -4,7 +4,7 @@
 //   article_53_attestation, get_buyer_account, get_audit_events,
 //   get_compliance_dossier  (require OPEDD_BUYER_JWT)
 //   list_feed, stream_feed_ndjson  (require OPEDD_ACCESS_KEY)
-//   list_publisher_content  (requires OPEDD_API_KEY)
+//   list_publisher_content  (requires OPEDD_PUB_BEARER OR legacy OPEDD_API_KEY)
 //
 // Separate file from dispatcher.test.ts because the TOOLS array push +
 // CallTool switch cases evaluate env-var presence at module-import time;
@@ -18,6 +18,7 @@ const TEST_BUYER_TOKEN = "opedd_buyer_test_env_gated_xxx";
 const TEST_BUYER_JWT = "eyJhbGc.env-gated-test.sig";
 const TEST_ACCESS_KEY = "ent_env_gated_test";
 const TEST_API_KEY = "op_env_gated_test_pub";
+const TEST_PUB_BEARER = "opedd_pub_test_env_gated_test_pub_canonical_xxxx"; // v0.4.0 canonical Bearer
 const TEST_BUYER_EMAIL = "env-gated@opedd-test.com";
 
 // Stub ALL env vars before any import — guarantees every conditional
@@ -27,6 +28,7 @@ beforeAll(() => {
   vi.stubEnv("OPEDD_BUYER_JWT", TEST_BUYER_JWT);
   vi.stubEnv("OPEDD_ACCESS_KEY", TEST_ACCESS_KEY);
   vi.stubEnv("OPEDD_API_KEY", TEST_API_KEY);
+  vi.stubEnv("OPEDD_PUB_BEARER", TEST_PUB_BEARER);
   vi.stubEnv("OPEDD_BUYER_EMAIL", TEST_BUYER_EMAIL);
   vi.stubEnv("OPEDD_API_URL", "https://api.opedd.com");
 });
@@ -257,15 +259,18 @@ describe("dispatchTool: stream_feed_ndjson (ACCESS_KEY gated)", () => {
 
 // ───────────────────────────── API_KEY-gated tool ─────────────────────────────
 
-describe("dispatchTool: list_publisher_content (API_KEY gated)", () => {
-  it("happy path — sends /api?action=articles + X-API-Key header", async () => {
+describe("dispatchTool: list_publisher_content (PUB_BEARER preferred; API_KEY fallback)", () => {
+  it("happy path — sends /api?action=articles + Authorization: Bearer canonical (v0.4.0)", async () => {
     const f = mockFetchOk({ success: true, data: { articles: [] } });
     const { dispatchTool } = await loadDispatcher();
     await dispatchTool("list_publisher_content", { limit: 20 });
     const call = f.mock.calls[0];
     expect(String(call[0])).toContain("/api?action=articles");
     const headers = (call[1] as RequestInit).headers as Record<string, string>;
-    expect(headers["X-API-Key"]).toBe(TEST_API_KEY);
+    // v0.4.0: Bearer preferred when OPEDD_PUB_BEARER is set; X-API-Key
+    // legacy fallback only when PUB_BEARER unset.
+    expect(headers["Authorization"]).toBe("Bearer " + TEST_PUB_BEARER);
+    expect(headers["X-API-Key"]).toBeUndefined();
   });
 
   it("limit capped at 100", async () => {

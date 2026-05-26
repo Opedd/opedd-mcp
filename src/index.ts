@@ -17,7 +17,16 @@ const API_BASE =
 
 const BUYER_EMAIL = process.env.OPEDD_BUYER_EMAIL;
 const PAYMENT_METHOD_ID = process.env.OPEDD_PAYMENT_METHOD_ID;
-const API_KEY = process.env.OPEDD_API_KEY; // publisher API key (op_...)
+// B91 v0.4.0 migration (2026-05-26): canonical Bearer auth.
+// OPEDD_PUB_BEARER is the new canonical opedd_pub_<env>_<32-hex> key
+// (issued via POST /publishers-api-keys action=create_api_key).
+// OPEDD_API_KEY retained as backward-compat alias for legacy op_ keys
+// during the dual-mode transition window on the /api endpoint (Phase A
+// shipped opedd-backend 2026-05-26). Backend Phase C will drop the
+// op_ path entirely; users MUST migrate to OPEDD_PUB_BEARER before
+// then. Prefer Bearer if both set.
+const PUB_BEARER = process.env.OPEDD_PUB_BEARER; // canonical opedd_pub_<env>_<32-hex>
+const API_KEY = process.env.OPEDD_API_KEY; // LEGACY op_<32-hex> — retiring per backend Phase C
 const BUYER_TOKEN = process.env.OPEDD_BUYER_TOKEN; // buyer API token (opedd_buyer_live_... or opedd_buyer_test_...)
 const ACCESS_KEY = process.env.OPEDD_ACCESS_KEY; // enterprise access key (ent_*); for /enterprise-license GET feed
 const BUYER_JWT = process.env.OPEDD_BUYER_JWT; // Supabase JWT; for /buyer-audit + /buyer-compliance-report
@@ -28,7 +37,9 @@ async function opeddFetch(path: string, options: RequestInit = {}): Promise<unkn
   const url = `${API_BASE}${path}`;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(API_KEY ? { "X-API-Key": API_KEY } : {}),
+    // B91 v0.4.0 (2026-05-26): canonical Bearer preferred; legacy X-API-Key
+    // accepted only as fallback during transition window
+    ...(PUB_BEARER ? { Authorization: `Bearer ${PUB_BEARER}` } : (API_KEY ? { "X-API-Key": API_KEY } : {})),
     ...(options.headers as Record<string, string> ?? {}),
   };
   const res = await fetch(url, { ...options, headers });
@@ -50,7 +61,8 @@ async function opeddFetchNdjson(
   const url = `${API_BASE}${path}`;
   const headers: Record<string, string> = {
     Accept: "application/x-ndjson",
-    ...(API_KEY ? { "X-API-Key": API_KEY } : {}),
+    // B91 v0.4.0 (2026-05-26): canonical Bearer preferred; legacy fallback
+    ...(PUB_BEARER ? { Authorization: `Bearer ${PUB_BEARER}` } : (API_KEY ? { "X-API-Key": API_KEY } : {})),
     ...(options.headers as Record<string, string> ?? {}),
   };
   const res = await fetch(url, { ...options, headers });
@@ -570,11 +582,11 @@ if (BUYER_JWT) {
 }
 
 // If a publisher API key is configured, expose publisher-specific tooling
-if (API_KEY) {
+if (PUB_BEARER || API_KEY) {
   TOOLS.push({
     name: "list_publisher_content",
     description:
-      "List all licensable articles for the authenticated publisher (requires OPEDD_API_KEY). " +
+      "List all licensable articles for the authenticated publisher (requires OPEDD_PUB_BEARER, or legacy OPEDD_API_KEY). " +
       "Returns articles with titles, descriptions, pricing, and sales statistics. " +
       "Use article IDs from this list to purchase licenses via purchase_license.",
     inputSchema: {
@@ -977,8 +989,8 @@ export async function dispatchTool(
 
       // ── list_publisher_content ─────────────────────────────────────────────
       case "list_publisher_content": {
-        if (!API_KEY) {
-          return err("OPEDD_API_KEY env var is required for this tool");
+        if (!PUB_BEARER && !API_KEY) {
+          return err("OPEDD_PUB_BEARER env var is required for this tool (canonical Bearer; legacy OPEDD_API_KEY also accepted during transition)");
         }
 
         const { limit = 20, type, offset = 0 } = args as {
