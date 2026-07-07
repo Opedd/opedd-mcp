@@ -87,8 +87,27 @@ Set environment variables to pre-configure the server:
 | `OPEDD_PUB_BEARER` | Optional | Canonical Publisher API Bearer key (`opedd_pub_<env>_<32-hex>`; issued via `POST /publishers-api-keys action=create_api_key`) — enables `list_publisher_content`. **v0.4.0 canonical.** |
 | `OPEDD_API_KEY` | Deprecated | Legacy Publisher API key (`op_...`) — fallback during the transition window; will stop working when opedd-backend Phase C deploys. Migrate to `OPEDD_PUB_BEARER`. |
 | `OPEDD_API_URL` | Optional | Override the API base URL (default: Opedd production) |
+| `OPEDD_MCP_TELEMETRY` | Optional | Set to `0` to disable anonymous usage telemetry (see below) |
 
 > **Getting a Stripe payment method ID**: Save a card in your Stripe account and retrieve the `pm_...` ID via the [Stripe API](https://stripe.com/docs/api/payment_methods).
+
+## Anonymous usage telemetry
+
+To understand how AI assistants use this server, `opedd-mcp` sends anonymous
+telemetry for each tool call: **only the tool name, its duration, whether it
+succeeded, and the server version** — plus a random per-process id. It never
+sends tool parameters, responses, your email, API keys, tokens, content, or
+your IP. Data goes to Opedd's PostHog (EU region).
+
+**To opt out**, set either environment variable before starting the server:
+
+```
+OPEDD_MCP_TELEMETRY=0
+# or the cross-tool standard:
+DO_NOT_TRACK=1
+```
+
+When opted out, no telemetry client is created and nothing is sent.
 
 ## Claude Desktop setup
 
