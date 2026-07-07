@@ -18,9 +18,9 @@ import { randomUUID } from "node:crypto";
 
 // Public, write-only PostHog project key (EU cloud, project 218295). Safe to
 // embed — it can only send events, not read data.
-const POSTHOG_KEY = "phc_zrKQzZLUZikynMWJWMHUiQBgRsJa2fLzDFMdh6HxGU6c";
+const POSTHOG_KEY = "phc_yfyXBNsf5nZncZBiZNQBBs5RWC3mtWNWpUJv5EfzfBir";
 const POSTHOG_HOST = "https://eu.i.posthog.com";
-const SERVER_VERSION = "0.5.0";
+const SERVER_VERSION = "0.5.1";
 
 /** Whether telemetry is allowed (respects OPEDD_MCP_TELEMETRY + DO_NOT_TRACK). Pure — exported for tests. */
 export function isTelemetryEnabled(): boolean {
