@@ -8,6 +8,7 @@ import {
   type Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import { pathToFileURL } from "node:url";
+import { initTelemetry, captureToolCall, shutdownTelemetry } from "./telemetry.js";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -619,9 +620,18 @@ const server = new Server(
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
 
-server.setRequestHandler(CallToolRequestSchema, async (request) =>
-  dispatchTool(request.params.name, (request.params.arguments ?? {}) as Record<string, unknown>),
-);
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  // Anonymous usage telemetry — captures only the tool name, duration, and
+  // success flag (see telemetry.ts). Wrapping the runtime handler (not
+  // dispatchTool) keeps unit tests, which call dispatchTool directly, silent.
+  const start = Date.now();
+  const result = await dispatchTool(
+    request.params.name,
+    (request.params.arguments ?? {}) as Record<string, unknown>,
+  );
+  captureToolCall(request.params.name, Date.now() - start, result.isError !== true);
+  return result;
+});
 
 // ─── Tool dispatcher (exported for unit tests) ────────────────────────────────
 //
@@ -1028,6 +1038,12 @@ if (
   process.argv?.[1] &&
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
+  initTelemetry();
+  for (const sig of ["SIGINT", "SIGTERM"] as const) {
+    process.on(sig, () => {
+      void shutdownTelemetry().finally(() => process.exit(0));
+    });
+  }
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("[opedd-mcp] Server running on stdio");
