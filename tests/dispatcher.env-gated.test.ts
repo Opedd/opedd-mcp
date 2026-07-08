@@ -68,7 +68,7 @@ function mockFetchNdjson(lines: unknown[]): ReturnType<typeof vi.fn> {
 // ───────────────────────────── all env-gated tools register ─────────────────────────────
 
 describe("TOOLS array with all env vars set", () => {
-  it("exposes the 7 env-gated tools alongside the 8 always-available", async () => {
+  it("exposes the 8 env-gated tools alongside the always-available", async () => {
     const { TOOLS } = await loadDispatcher();
     const names = TOOLS.map((t) => t.name);
     // BUYER_TOKEN-gated
@@ -81,9 +81,10 @@ describe("TOOLS array with all env vars set", () => {
     // ACCESS_KEY-gated
     expect(names).toContain("list_feed");
     expect(names).toContain("stream_feed_ndjson");
-    // API_KEY-gated
+    // API_KEY-gated (publisher-side: list + push)
     expect(names).toContain("list_publisher_content");
-    expect(names.length).toBe(16);
+    expect(names).toContain("push_content");
+    expect(names.length).toBe(17);
   });
 });
 
@@ -279,5 +280,30 @@ describe("dispatchTool: list_publisher_content (PUB_BEARER preferred; API_KEY fa
     await dispatchTool("list_publisher_content", { limit: 999 });
     const call = String(f.mock.calls[0][0]);
     expect(call).toContain("limit=100");
+  });
+});
+
+describe("dispatchTool: push_content (PUB_BEARER gated)", () => {
+  it("POSTs /publishers-content with the articles + Bearer auth", async () => {
+    const f = mockFetchOk({ success: true, data: { inserted_count: 1 } });
+    const { dispatchTool } = await loadDispatcher();
+    const articles = [{ title: "T", url: "https://example.com/a", html_body: "<p>x</p>" }];
+    const result = await dispatchTool("push_content", { articles });
+    const call = f.mock.calls[0];
+    expect(String(call[0])).toContain("/publishers-content");
+    expect((call[1] as RequestInit).method).toBe("POST");
+    expect(JSON.parse(String((call[1] as RequestInit).body))).toEqual({ articles });
+    const headers = (call[1] as RequestInit).headers as Record<string, string>;
+    expect(headers["Authorization"]).toBe("Bearer " + TEST_PUB_BEARER);
+    expect(result.isError).toBeUndefined();
+  });
+
+  it("rejects an empty articles array before calling the API", async () => {
+    const f = mockFetchOk({});
+    const { dispatchTool } = await loadDispatcher();
+    const result = await dispatchTool("push_content", { articles: [] });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("non-empty array");
+    expect(f).not.toHaveBeenCalled();
   });
 });

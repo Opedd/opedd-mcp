@@ -8,7 +8,7 @@ Lets AI assistants (Claude Desktop, Cursor, Windsurf, or any MCP-compatible host
 
 ## What it does
 
-Exposes up to 16 tools to any AI assistant (some are conditional on env vars):
+Exposes up to 17 tools to any AI assistant (some are conditional on env vars):
 
 **Always available — discovery + per-article purchase + onboarding + rights signaling**
 
@@ -50,6 +50,7 @@ Exposes up to 16 tools to any AI assistant (some are conditional on env vars):
 | Tool | Description |
 |------|-------------|
 | `list_publisher_content` | List your own articles with pricing and stats |
+| `push_content` | Push your articles to Opedd so AI buyers can license them — 1–100 per call (`title`/`url`/`html_body` required, everything else optional). Onboard your back-catalogue or new posts with no code, straight from your AI assistant. |
 
 ### Regulatory framing (CDSM Article 4 vs EU AI Act Article 53 — never conflated)
 
@@ -84,7 +85,7 @@ Set environment variables to pre-configure the server:
 | `OPEDD_BUYER_TOKEN` | Optional | Buyer API token (`opedd_buyer_live_*` canonical; `opedd_buyer_test_*` for sandbox) — enables `get_content` |
 | `OPEDD_ACCESS_KEY` | Optional | Enterprise access key (`ent_*`) — enables `list_feed` + `stream_feed_ndjson` |
 | `OPEDD_BUYER_JWT` | Optional | Supabase session JWT from the buyer portal — enables `get_audit_events` + `get_compliance_dossier` |
-| `OPEDD_PUB_BEARER` | Optional | Canonical Publisher API Bearer key (`opedd_pub_<env>_<32-hex>`; issued via `POST /publishers-api-keys action=create_api_key`) — enables `list_publisher_content`. **v0.4.0 canonical.** |
+| `OPEDD_PUB_BEARER` | Optional | Canonical Publisher API Bearer key (`opedd_pub_<env>_<32-hex>`; issued via `POST /publishers-api-keys action=create_api_key`) — enables `list_publisher_content` + `push_content`. **v0.4.0 canonical.** |
 | `OPEDD_API_KEY` | Deprecated | Legacy Publisher API key (`op_...`) — fallback during the transition window; will stop working when opedd-backend Phase C deploys. Migrate to `OPEDD_PUB_BEARER`. |
 | `OPEDD_API_URL` | Optional | Override the API base URL (default: Opedd production) |
 | `OPEDD_MCP_TELEMETRY` | Optional | Set to `0` to disable anonymous usage telemetry (see below) |
