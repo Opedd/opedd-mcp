@@ -609,12 +609,54 @@ if (PUB_BEARER || API_KEY) {
       },
     },
   });
+
+  // Supply-side push: onboard a back-catalogue or send new posts directly from
+  // the AI assistant — the native companion to the /publishers-content API.
+  TOOLS.push({
+    name: "push_content",
+    description:
+      "Push your published articles to Opedd so they can be licensed to AI buyers (requires OPEDD_PUB_BEARER — your opedd_pub_ publisher key). " +
+      "Send 1–100 articles per call; batch larger back-catalogues into multiple calls. Each article needs title, url, and html_body — everything else is optional (published_at defaults to now). " +
+      "This is the supply-side companion to list_publisher_content: use it to onboard your archive or push new content with no code, straight from your AI assistant.",
+    inputSchema: {
+      type: "object",
+      required: ["articles"],
+      properties: {
+        articles: {
+          type: "array",
+          minItems: 1,
+          maxItems: 100,
+          description: "1–100 articles to push in this call.",
+          items: {
+            type: "object",
+            required: ["title", "url", "html_body"],
+            properties: {
+              title: { type: "string", description: "Article title (required, ≤500 chars)." },
+              url: { type: "string", description: "The article's canonical web address (required)." },
+              html_body: { type: "string", description: "Full article content, HTML or plain text (required, ≤200,000 chars)." },
+              published_at: { type: "string", description: "ISO-8601 datetime (e.g. 2026-01-15T09:30:00Z). Defaults to now if omitted." },
+              description: { type: "string", description: "Short summary (≤500 chars)." },
+              author: { type: "string", description: "Author name (≤200 chars)." },
+              language: { type: "string", description: "Language code, e.g. \"en\"." },
+              tags: { type: "array", items: { type: "string" }, description: "Up to 20 tags." },
+              image_urls: { type: "array", items: { type: "string" }, description: "Up to 10 body-image URLs." },
+              thumbnail_url: { type: "string", description: "https cover-image URL for the catalog." },
+              canonical_url: { type: "string", description: "Canonical URL if different from url." },
+              category: { type: "string", description: "Content category." },
+              is_paid: { type: "boolean", description: "Whether the article is behind a paywall." },
+              audience: { type: "string", enum: ["everyone", "only_free", "only_paid"], description: "Intended audience." },
+            },
+          },
+        },
+      },
+    },
+  });
 }
 
 // ─── MCP Server ───────────────────────────────────────────────────────────────
 
 const server = new Server(
-  { name: "opedd-mcp", version: "0.3.0" },
+  { name: "opedd-mcp", version: "0.6.0" },
   { capabilities: { tools: {} } }
 );
 
@@ -1015,6 +1057,27 @@ export async function dispatchTool(
         if (type) params.set("type", type);
 
         const data = await opeddFetch(`/api?${params.toString()}`);
+        return ok(data);
+      }
+
+      // ── push_content ───────────────────────────────────────────────────────
+      case "push_content": {
+        if (!PUB_BEARER && !API_KEY) {
+          return err("OPEDD_PUB_BEARER env var is required for this tool (your opedd_pub_ publisher key).");
+        }
+        const { articles } = args as { articles?: unknown[] };
+        if (!Array.isArray(articles) || articles.length === 0) {
+          return err("`articles` must be a non-empty array (1–100 items).");
+        }
+        if (articles.length > 100) {
+          return err(`Too many articles in one call (${articles.length}). Send at most 100 per call and batch the rest.`);
+        }
+        // Backend /publishers-content enforces the full strict schema + returns
+        // clear per-article errors; we pass through so the assistant can relay them.
+        const data = await opeddFetch("/publishers-content", {
+          method: "POST",
+          body: JSON.stringify({ articles }),
+        });
         return ok(data);
       }
 
