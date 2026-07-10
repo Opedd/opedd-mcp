@@ -35,6 +35,11 @@ const BUYER_JWT = process.env.OPEDD_BUYER_JWT; // Supabase JWT; for /buyer-audit
 
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────
 
+// 30s cap (2026-07-10 hardening audit): without it a hung api.opedd.com
+// call hangs the agent's tool call indefinitely — an MCP server must fail
+// fast so the agent can recover.
+const FETCH_TIMEOUT_MS = 30_000;
+
 async function opeddFetch(path: string, options: RequestInit = {}): Promise<unknown> {
   const url = `${API_BASE}${path}`;
   const headers: Record<string, string> = {
@@ -44,13 +49,20 @@ async function opeddFetch(path: string, options: RequestInit = {}): Promise<unkn
     ...(PUB_BEARER ? { Authorization: `Bearer ${PUB_BEARER}` } : (API_KEY ? { "X-API-Key": API_KEY } : {})),
     ...(options.headers as Record<string, string> ?? {}),
   };
-  const res = await fetch(url, { ...options, headers });
-  const body = await res.json();
+  const res = await fetch(url, { ...options, headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+  // Check ok BEFORE parsing (2026-07-10 hardening): an HTML 502/504 from the
+  // proxy must surface as "HTTP 502", not a JSON SyntaxError.
   if (!res.ok) {
-    const msg = (body as any)?.error || (body as any)?.message || `HTTP ${res.status}`;
+    let msg = `HTTP ${res.status}`;
+    try {
+      const errBody = await res.json();
+      msg = (errBody as any)?.error || (errBody as any)?.message || msg;
+    } catch {
+      // non-JSON error body — keep the HTTP-status default
+    }
     throw new Error(msg);
   }
-  return body;
+  return await res.json();
 }
 
 // Fetch an NDJSON endpoint and collect parsed lines into an array.
@@ -67,7 +79,7 @@ async function opeddFetchNdjson(
     ...(PUB_BEARER ? { Authorization: `Bearer ${PUB_BEARER}` } : (API_KEY ? { "X-API-Key": API_KEY } : {})),
     ...(options.headers as Record<string, string> ?? {}),
   };
-  const res = await fetch(url, { ...options, headers });
+  const res = await fetch(url, { ...options, headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;
     try {

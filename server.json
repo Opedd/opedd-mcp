@@ -6,13 +6,13 @@
     "url": "https://github.com/Opedd/opedd-mcp",
     "source": "github"
   },
-  "version": "0.6.2",
+  "version": "0.6.3",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "opedd-mcp",
-      "version": "0.6.2",
+      "version": "0.6.3",
       "transport": {
         "type": "stdio"
       },
@@ -54,6 +54,17 @@
           "isSecret": true
         }
       ]
+    }
+  ],
+  "title": "Opedd — Licensed Content for AI",
+  "websiteUrl": "https://opedd.com/for-ai-agents",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/Opedd/opedd-mcp/main/assets/opedd-icon-512.png",
+      "sizes": [
+        "512x512"
+      ],
+      "mimeType": "image/png"
     }
   ]
 }

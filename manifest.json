@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "opedd-mcp",
   "display_name": "Opedd — Licensed Content for AI",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Licensed, rights-cleared content for AI agents - verifiable license keys + EU AI Act attestation.",
   "long_description": "Opedd is the licensing rail between expert publishers and AI products. Agents discover, purchase, verify, and retrieve rights-cleared expert analysis with a verifiable license key per article, on-chain proof (Tempo), and EU AI Act Article 53 attestation artifacts. The alternative to unlicensed scraping for RAG, AI search, and training pipelines. 17 tools: lookup, autonomous purchase, verification, publisher directory, enterprise/metered licensing, bulk feeds, audit ledger, compliance dossiers, and publisher-side content push.",
   "author": {
@@ -14,7 +14,14 @@
   "documentation": "https://github.com/Opedd/opedd-mcp#readme",
   "support": "https://github.com/Opedd/opedd-mcp/issues",
   "license": "MIT",
-  "keywords": ["licensing", "content", "rag", "eu-ai-act", "copyright", "ai-agents"],
+  "keywords": [
+    "licensing",
+    "content",
+    "rag",
+    "eu-ai-act",
+    "copyright",
+    "ai-agents"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/Opedd/opedd-mcp"
@@ -24,15 +31,26 @@
     "entry_point": "dist/index.js",
     "mcp_config": {
       "command": "node",
-      "args": ["${__dirname}/dist/index.js"],
+      "args": [
+        "${__dirname}/dist/index.js"
+      ],
       "env": {
         "OPEDD_BUYER_EMAIL": "${user_config.buyer_email}",
         "OPEDD_PAYMENT_METHOD_ID": "${user_config.payment_method_id}",
         "OPEDD_BUYER_TOKEN": "${user_config.buyer_token}",
+        "OPEDD_ACCESS_KEY": "${user_config.access_key}",
+        "OPEDD_BUYER_JWT": "${user_config.buyer_jwt}",
         "OPEDD_PUB_BEARER": "${user_config.pub_bearer}"
       }
     }
   },
+  "icons": [
+    {
+      "src": "assets/opedd-icon-512.png",
+      "sizes": "512x512",
+      "mimeType": "image/png"
+    }
+  ],
   "user_config": {
     "buyer_email": {
       "type": "string",
@@ -51,6 +69,20 @@
       "type": "string",
       "title": "Buyer API token (opedd_buyer_live_*)",
       "description": "Enables licensed content retrieval",
+      "sensitive": true,
+      "required": false
+    },
+    "access_key": {
+      "type": "string",
+      "title": "Enterprise access key (ent_*)",
+      "description": "Enables bulk feed tools (list_feed, stream_feed_ndjson)",
+      "sensitive": true,
+      "required": false
+    },
+    "buyer_jwt": {
+      "type": "string",
+      "title": "Buyer portal session JWT",
+      "description": "Enables account, audit, compliance + EU AI Act attestation tools",
       "sensitive": true,
       "required": false
     },
