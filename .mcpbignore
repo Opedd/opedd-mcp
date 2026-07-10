@@ -1,0 +1,14 @@
+.env
+.env.*
+.git
+.github
+src
+tests
+*.test.ts
+tsconfig.json
+vitest.config.ts
+smithery.yaml
+server.json
+glama.json
+.mcp.json
+package-lock.json

@@ -1,10 +1,37 @@
-# opedd-mcp
+<p align="center">
+  <img src="assets/opedd-logo.png" alt="Opedd" height="72">
+</p>
 
-Licensed content retrieval for AI agents via [MCP (Model Context Protocol)](https://modelcontextprotocol.io). The alternative to unlicensed web scraping for RAG pipelines, AI search, and LLM grounding.
+<h1 align="center">opedd-mcp</h1>
+
+<p align="center">
+  <strong>Licensed, rights-cleared content for AI agents</strong> — the alternative to unlicensed scraping for RAG, AI search, and LLM grounding.
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/opedd-mcp"><img src="https://img.shields.io/npm/v/opedd-mcp?color=4A26ED&label=npm" alt="npm"></a>
+  <a href="https://www.npmjs.com/package/opedd-mcp"><img src="https://img.shields.io/npm/dm/opedd-mcp?color=4A26ED&label=downloads" alt="downloads"></a>
+  <a href="https://registry.modelcontextprotocol.io/v0/servers?search=opedd"><img src="https://img.shields.io/badge/MCP%20Registry-com.opedd%2Fopedd--mcp-4A26ED" alt="MCP Registry"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/npm/l/opedd-mcp?color=4A26ED" alt="MIT"></a>
+</p>
+
+<p align="center">
+  <a href="cursor://anysphere.cursor-deeplink/mcp/install?name=opedd&config=eyJjb21tYW5kIjoibnB4IC15IG9wZWRkLW1jcCJ9"><img src="https://img.shields.io/badge/Add%20to-Cursor-000?logo=cursor" alt="Add to Cursor"></a>
+  <a href="https://insiders.vscode.dev/redirect/mcp/install?name=opedd&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22opedd-mcp%22%5D%7D"><img src="https://img.shields.io/badge/Install%20in-VS%20Code-007ACC?logo=visualstudiocode" alt="Install in VS Code"></a>
+  <a href="https://opedd.com/for-ai-agents"><img src="https://img.shields.io/badge/Docs-opedd.com-111" alt="Docs"></a>
+</p>
 
 Lets AI assistants (Claude Desktop, Cursor, Windsurf, or any MCP-compatible host) discover, purchase, and verify content licenses autonomously — mid-conversation, without opening a browser. Every license is registered on-chain (Tempo blockchain) with cryptographic proof.
 
 **Unlike generic search APIs**, Opedd returns content with a verifiable license key — defensible under the EU AI Act and any copyright jurisdiction.
+
+## Quick start
+
+```bash
+npx opedd-mcp
+```
+
+Then add it to your MCP host (see [Claude Desktop / Cursor / Windsurf setup](#claude-desktop-setup) below). Discovery + verification tools work with no configuration; purchasing and content retrieval use optional API keys from [opedd.com](https://opedd.com).
 
 ## What it does
 

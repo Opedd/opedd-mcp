@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "opedd": {
+      "command": "npx",
+      "args": ["-y", "opedd-mcp"]
+    }
+  }
+}
