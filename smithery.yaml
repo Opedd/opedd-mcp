@@ -1,0 +1,38 @@
+# Smithery deployment spec — https://smithery.ai/docs
+# Opedd MCP: licensed, rights-cleared content for AI agents.
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      opeddBuyerEmail:
+        type: string
+        description: Your email — default buyer identity for purchases
+      opeddPaymentMethodId:
+        type: string
+        description: Stripe PaymentMethod id (pm_...) for autonomous purchasing
+      opeddBuyerToken:
+        type: string
+        description: Buyer API token (opedd_buyer_live_*) — enables content retrieval
+      opeddAccessKey:
+        type: string
+        description: Enterprise access key (ent_*) — enables bulk feed tools
+      opeddBuyerJwt:
+        type: string
+        description: Buyer portal session JWT — account/audit/compliance/EU-AI-Act tools
+      opeddPubBearer:
+        type: string
+        description: Publisher API key (opedd_pub_*) — publisher push tools
+  commandFunction: |-
+    (config) => ({
+      command: 'node',
+      args: ['dist/index.js'],
+      env: {
+        ...(config.opeddBuyerEmail ? { OPEDD_BUYER_EMAIL: config.opeddBuyerEmail } : {}),
+        ...(config.opeddPaymentMethodId ? { OPEDD_PAYMENT_METHOD_ID: config.opeddPaymentMethodId } : {}),
+        ...(config.opeddBuyerToken ? { OPEDD_BUYER_TOKEN: config.opeddBuyerToken } : {}),
+        ...(config.opeddAccessKey ? { OPEDD_ACCESS_KEY: config.opeddAccessKey } : {}),
+        ...(config.opeddBuyerJwt ? { OPEDD_BUYER_JWT: config.opeddBuyerJwt } : {}),
+        ...(config.opeddPubBearer ? { OPEDD_PUB_BEARER: config.opeddPubBearer } : {})
+      }
+    })

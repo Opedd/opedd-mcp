@@ -9,6 +9,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { pathToFileURL } from "node:url";
 import { initTelemetry, captureToolCall, shutdownTelemetry } from "./telemetry.js";
+import { SERVER_VERSION } from "./version.js";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -656,7 +657,7 @@ if (PUB_BEARER || API_KEY) {
 // ─── MCP Server ───────────────────────────────────────────────────────────────
 
 const server = new Server(
-  { name: "opedd-mcp", version: "0.6.0" },
+  { name: "opedd-mcp", version: SERVER_VERSION },
   { capabilities: { tools: {} } }
 );
 
@@ -1006,8 +1007,13 @@ export async function dispatchTool(
         if (window_start) params.set("window_start", window_start);
         if (window_end) params.set("window_end", window_end);
 
+        // Function name is DASH-separated end to end: the api.opedd.com proxy
+        // rewrites /:path* verbatim into /functions/v1/:path*, so the prior
+        // slashed "/eu-ai-act/article-53-attestation" resolved to a
+        // nonexistent function named "eu-ai-act" and 404'd — this tool had
+        // NEVER worked in production until the 2026-07-10 fix (live-probed).
         const data = await opeddFetch(
-          `/eu-ai-act/article-53-attestation?${params.toString()}`,
+          `/eu-ai-act-article-53-attestation?${params.toString()}`,
           { headers: { Authorization: `Bearer ${BUYER_JWT}` } },
         );
         return ok(data);
