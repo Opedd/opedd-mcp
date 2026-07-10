@@ -1,10 +1,10 @@
 {
   "name": "opedd-mcp",
-  "version": "0.6.1",
-  "description": "Licensed content for AI agents \u2014 discover, purchase, verify, and retrieve rights-cleared expert analysis with a verifiable license key per article, on-chain proof, and EU AI Act Article 53 attestation. The alternative to unlicensed scraping for RAG, AI search, and training pipelines.",
+  "version": "0.6.2",
+  "description": "Licensed content for AI agents — discover, purchase, verify, and retrieve rights-cleared expert analysis with a verifiable license key per article, on-chain proof, and EU AI Act Article 53 attestation. The alternative to unlicensed scraping for RAG, AI search, and training pipelines.",
   "type": "module",
   "main": "dist/index.js",
-  "mcpName": "io.github.opedd/opedd-mcp",
+  "mcpName": "com.opedd/opedd-mcp",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Opedd/opedd-mcp.git"
