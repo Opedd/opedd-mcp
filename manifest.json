@@ -1,0 +1,65 @@
+{
+  "manifest_version": "0.2",
+  "name": "opedd-mcp",
+  "display_name": "Opedd — Licensed Content for AI",
+  "version": "0.6.2",
+  "description": "Licensed, rights-cleared content for AI agents - verifiable license keys + EU AI Act attestation.",
+  "long_description": "Opedd is the licensing rail between expert publishers and AI products. Agents discover, purchase, verify, and retrieve rights-cleared expert analysis with a verifiable license key per article, on-chain proof (Tempo), and EU AI Act Article 53 attestation artifacts. The alternative to unlicensed scraping for RAG, AI search, and training pipelines. 17 tools: lookup, autonomous purchase, verification, publisher directory, enterprise/metered licensing, bulk feeds, audit ledger, compliance dossiers, and publisher-side content push.",
+  "author": {
+    "name": "Opedd",
+    "email": "hello@opedd.com",
+    "url": "https://opedd.com"
+  },
+  "homepage": "https://opedd.com/for-ai-agents",
+  "documentation": "https://github.com/Opedd/opedd-mcp#readme",
+  "support": "https://github.com/Opedd/opedd-mcp/issues",
+  "license": "MIT",
+  "keywords": ["licensing", "content", "rag", "eu-ai-act", "copyright", "ai-agents"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Opedd/opedd-mcp"
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js"],
+      "env": {
+        "OPEDD_BUYER_EMAIL": "${user_config.buyer_email}",
+        "OPEDD_PAYMENT_METHOD_ID": "${user_config.payment_method_id}",
+        "OPEDD_BUYER_TOKEN": "${user_config.buyer_token}",
+        "OPEDD_PUB_BEARER": "${user_config.pub_bearer}"
+      }
+    }
+  },
+  "user_config": {
+    "buyer_email": {
+      "type": "string",
+      "title": "Buyer email",
+      "description": "Default buyer identity for purchases",
+      "required": false
+    },
+    "payment_method_id": {
+      "type": "string",
+      "title": "Stripe PaymentMethod id (pm_...)",
+      "description": "Enables autonomous per-article purchasing",
+      "sensitive": true,
+      "required": false
+    },
+    "buyer_token": {
+      "type": "string",
+      "title": "Buyer API token (opedd_buyer_live_*)",
+      "description": "Enables licensed content retrieval",
+      "sensitive": true,
+      "required": false
+    },
+    "pub_bearer": {
+      "type": "string",
+      "title": "Publisher API key (opedd_pub_*)",
+      "description": "Enables publisher content push tools",
+      "sensitive": true,
+      "required": false
+    }
+  }
+}
