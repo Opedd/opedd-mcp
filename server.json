@@ -1,18 +1,18 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.opedd/opedd-mcp",
-  "description": "Licensed content for AI agents — discover, purchase, verify, and retrieve rights-cleared expert analysis with a verifiable license key per article, on-chain proof, and EU AI Act Article 53 attestation.",
+  "name": "com.opedd/opedd-mcp",
+  "description": "Licensed, rights-cleared content for AI agents - verifiable license keys + EU AI Act attestation.",
   "repository": {
     "url": "https://github.com/Opedd/opedd-mcp",
     "source": "github"
   },
-  "version": "0.6.1",
+  "version": "0.6.2",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "opedd-mcp",
-      "version": "0.6.1",
+      "version": "0.6.2",
       "transport": {
         "type": "stdio"
       },
