@@ -84,7 +84,7 @@ Set environment variables to pre-configure the server:
 | `OPEDD_PAYMENT_METHOD_ID` | Recommended | Stripe `pm_...` ID — used for autonomous per-article purchasing |
 | `OPEDD_BUYER_TOKEN` | Optional | Buyer API token (`opedd_buyer_live_*` canonical; `opedd_buyer_test_*` for sandbox) — enables `get_content` |
 | `OPEDD_ACCESS_KEY` | Optional | Enterprise access key (`ent_*`) — enables `list_feed` + `stream_feed_ndjson` |
-| `OPEDD_BUYER_JWT` | Optional | Supabase session JWT from the buyer portal — enables `get_audit_events` + `get_compliance_dossier` |
+| `OPEDD_BUYER_JWT` | Optional | Supabase session JWT from the buyer portal — enables `get_buyer_account` + `get_audit_events` + `get_compliance_dossier` + `article_53_attestation` |
 | `OPEDD_PUB_BEARER` | Optional | Canonical Publisher API Bearer key (`opedd_pub_<env>_<32-hex>`; issued via `POST /publishers-api-keys action=create_api_key`) — enables `list_publisher_content` + `push_content`. **v0.4.0 canonical.** |
 | `OPEDD_API_KEY` | Deprecated | Legacy Publisher API key (`op_...`) — fallback during the transition window; will stop working when opedd-backend Phase C deploys. Migrate to `OPEDD_PUB_BEARER`. |
 | `OPEDD_API_URL` | Optional | Override the API base URL (default: Opedd production) |

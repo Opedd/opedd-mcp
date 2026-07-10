@@ -1,0 +1,59 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.opedd/opedd-mcp",
+  "description": "Licensed content for AI agents — discover, purchase, verify, and retrieve rights-cleared expert analysis with a verifiable license key per article, on-chain proof, and EU AI Act Article 53 attestation.",
+  "repository": {
+    "url": "https://github.com/Opedd/opedd-mcp",
+    "source": "github"
+  },
+  "version": "0.6.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "opedd-mcp",
+      "version": "0.6.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "OPEDD_BUYER_EMAIL",
+          "description": "Your email — default buyer identity for purchases",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "OPEDD_PAYMENT_METHOD_ID",
+          "description": "Stripe PaymentMethod id (pm_...) for autonomous per-article purchasing",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "OPEDD_BUYER_TOKEN",
+          "description": "Buyer API token (opedd_buyer_live_*) — enables licensed content retrieval",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "OPEDD_ACCESS_KEY",
+          "description": "Enterprise access key (ent_*) — enables bulk feed tools",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "OPEDD_BUYER_JWT",
+          "description": "Buyer portal session JWT — enables account, audit, compliance + EU AI Act attestation tools",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "OPEDD_PUB_BEARER",
+          "description": "Publisher API key (opedd_pub_*) — enables publisher content push + listing tools",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

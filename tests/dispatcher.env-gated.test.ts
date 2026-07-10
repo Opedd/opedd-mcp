@@ -127,8 +127,14 @@ describe("dispatchTool: article_53_attestation (BUYER_JWT gated, chip 2)", () =>
       license_id: "11111111-2222-3333-4444-555555555555",
     });
     const call = f.mock.calls[0];
+    // DASH-separated function name end to end — the api.opedd.com proxy
+    // rewrites the path verbatim, so the pre-2026-07-10 slashed shape
+    // ("/eu-ai-act/article-53-attestation") routed to a nonexistent
+    // function and 404'd in production. This fixture asserted the broken
+    // URL for 6+ weeks — a guard poured around the wrong value. Any
+    // change to this path MUST be live-probed against api.opedd.com.
     expect(String(call[0])).toContain(
-      "/eu-ai-act/article-53-attestation?license_id=11111111-2222-3333-4444-555555555555",
+      "/eu-ai-act-article-53-attestation?license_id=11111111-2222-3333-4444-555555555555",
     );
   });
 
@@ -142,6 +148,7 @@ describe("dispatchTool: article_53_attestation (BUYER_JWT gated, chip 2)", () =>
       window_end: "2026-05-22T00:00:00Z",
     });
     const call = String(f.mock.calls[0][0]);
+    expect(call).toContain("/eu-ai-act-article-53-attestation?");
     expect(call).toContain("content_id=22222222");
     expect(call).toContain("window_start=2026-02-22T00%3A00%3A00Z");
     expect(call).toContain("window_end=2026-05-22T00%3A00%3A00Z");
