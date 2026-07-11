@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "opedd-mcp",
   "display_name": "Opedd — Licensed Content for AI",
-  "version": "0.6.5",
+  "version": "0.6.6",
   "description": "Licensed, rights-cleared content for AI agents - verifiable license keys + EU AI Act attestation.",
   "long_description": "Opedd is the licensing rail between expert publishers and AI products. Agents discover, purchase, verify, and retrieve rights-cleared expert analysis with a verifiable license key per article, on-chain proof (Tempo), and EU AI Act Article 53 attestation artifacts. The alternative to unlicensed scraping for RAG, AI search, and training pipelines. 17 tools: lookup, autonomous purchase, verification, publisher directory, enterprise/metered licensing, bulk feeds, audit ledger, compliance dossiers, and publisher-side content push.",
   "author": {

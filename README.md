@@ -33,6 +33,53 @@ npx opedd-mcp
 
 Then add it to your MCP host (see [Claude Desktop / Cursor / Windsurf setup](#claude-desktop-setup) below). Discovery + verification tools work with no configuration; purchasing and content retrieval use optional API keys from [opedd.com](https://opedd.com).
 
+## Hosted endpoint — no install (mcp.opedd.com)
+
+Prefer zero-install? The same 17 tools are served hosted at **`https://mcp.opedd.com/mcp`** (Streamable HTTP). Auth is an `Authorization: Bearer` header with any Opedd key — public discovery tools need no auth at all.
+
+**Claude Messages API** (production agents):
+
+```json
+{
+  "mcp_servers": [{
+    "type": "url",
+    "url": "https://mcp.opedd.com/mcp",
+    "name": "opedd",
+    "authorization_token": "opedd_buyer_live_..."
+  }]
+}
+```
+
+**OpenAI Responses API**:
+
+```json
+{
+  "tools": [{
+    "type": "mcp",
+    "server_label": "opedd",
+    "server_url": "https://mcp.opedd.com/mcp",
+    "authorization": "opedd_buyer_live_..."
+  }]
+}
+```
+
+**claude.ai / Claude Desktop custom connector** (all plans): Settings → Connectors → *Add custom connector* → URL `https://mcp.opedd.com/mcp`; add a `Authorization: Bearer <your key>` request header for the credentialed tools.
+
+**Cursor** (`.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "opedd": {
+      "url": "https://mcp.opedd.com/mcp",
+      "headers": { "Authorization": "Bearer ${env:OPEDD_KEY}" }
+    }
+  }
+}
+```
+
+Key routing: `opedd_pub_*` → publisher tools · `opedd_buyer_*` → content retrieval · `ent_*` → bulk feeds · buyer-portal JWT → audit/compliance/EU-AI-Act tools. Your key is forwarded per request and never stored by the gateway.
+
 ## What it does
 
 Exposes up to 17 tools to any AI assistant (some are conditional on env vars):
