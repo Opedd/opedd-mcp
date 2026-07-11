@@ -13,25 +13,46 @@ import { SERVER_VERSION } from "./version.js";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
-const API_BASE =
-  process.env.OPEDD_API_URL ??
-  "https://api.opedd.com";
+// ─── Credentials context (2026-07-11 hosted-gateway refactor) ────────────────
+// Credentials travel EXPLICITLY through dispatchTool/opeddFetch instead of
+// module-level env constants. Why: the hosted gateway (mcp.opedd.com) serves
+// many users from one isolate — module-global creds would cross-contaminate
+// concurrent requests (the data-leak class the MCP SDK >=1.26 warns about).
+// The stdio bin builds ENV_CREDS once from process.env — behavior-identical
+// to the pre-refactor constants; the gateway builds one per request from
+// Authorization headers.
+export interface Credentials {
+  apiBase: string;
+  buyerEmail?: string;
+  paymentMethodId?: string;
+  /** canonical opedd_pub_<env>_<32-hex> key */
+  pubBearer?: string;
+  /** LEGACY op_<32-hex> — retiring per backend Phase C */
+  apiKey?: string;
+  /** buyer API token (opedd_buyer_live_/_test_) */
+  buyerToken?: string;
+  /** enterprise access key (ent_*) — /enterprise-license GET feed */
+  accessKey?: string;
+  /** Supabase JWT — buyer-audit + compliance + Article 53 surfaces */
+  buyerJwt?: string;
+}
 
-const BUYER_EMAIL = process.env.OPEDD_BUYER_EMAIL;
-const PAYMENT_METHOD_ID = process.env.OPEDD_PAYMENT_METHOD_ID;
-// B91 v0.4.0 migration (2026-05-26): canonical Bearer auth.
-// OPEDD_PUB_BEARER is the new canonical opedd_pub_<env>_<32-hex> key
-// (issued via POST /publishers-api-keys action=create_api_key).
-// OPEDD_API_KEY retained as backward-compat alias for legacy op_ keys
-// during the dual-mode transition window on the /api endpoint (Phase A
-// shipped opedd-backend 2026-05-26). Backend Phase C will drop the
-// op_ path entirely; users MUST migrate to OPEDD_PUB_BEARER before
-// then. Prefer Bearer if both set.
-const PUB_BEARER = process.env.OPEDD_PUB_BEARER; // canonical opedd_pub_<env>_<32-hex>
-const API_KEY = process.env.OPEDD_API_KEY; // LEGACY op_<32-hex> — retiring per backend Phase C
-const BUYER_TOKEN = process.env.OPEDD_BUYER_TOKEN; // buyer API token (opedd_buyer_live_... or opedd_buyer_test_...)
-const ACCESS_KEY = process.env.OPEDD_ACCESS_KEY; // enterprise access key (ent_*); for /enterprise-license GET feed
-const BUYER_JWT = process.env.OPEDD_BUYER_JWT; // Supabase JWT; for /buyer-audit + /buyer-compliance-report
+export function envCredentials(): Credentials {
+  return {
+    apiBase: process.env.OPEDD_API_URL ?? "https://api.opedd.com",
+    buyerEmail: process.env.OPEDD_BUYER_EMAIL,
+    paymentMethodId: process.env.OPEDD_PAYMENT_METHOD_ID,
+    // B91 v0.4.0 (2026-05-26): OPEDD_PUB_BEARER canonical; OPEDD_API_KEY is
+    // the legacy op_ alias during the dual-mode transition window.
+    pubBearer: process.env.OPEDD_PUB_BEARER,
+    apiKey: process.env.OPEDD_API_KEY,
+    buyerToken: process.env.OPEDD_BUYER_TOKEN,
+    accessKey: process.env.OPEDD_ACCESS_KEY,
+    buyerJwt: process.env.OPEDD_BUYER_JWT,
+  };
+}
+
+const ENV_CREDS: Credentials = envCredentials();
 
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────
 
@@ -40,13 +61,13 @@ const BUYER_JWT = process.env.OPEDD_BUYER_JWT; // Supabase JWT; for /buyer-audit
 // fast so the agent can recover.
 const FETCH_TIMEOUT_MS = 30_000;
 
-async function opeddFetch(path: string, options: RequestInit = {}): Promise<unknown> {
-  const url = `${API_BASE}${path}`;
+async function opeddFetch(creds: Credentials, path: string, options: RequestInit = {}): Promise<unknown> {
+  const url = `${creds.apiBase}${path}`;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     // B91 v0.4.0 (2026-05-26): canonical Bearer preferred; legacy X-API-Key
     // accepted only as fallback during transition window
-    ...(PUB_BEARER ? { Authorization: `Bearer ${PUB_BEARER}` } : (API_KEY ? { "X-API-Key": API_KEY } : {})),
+    ...(creds.pubBearer ? { Authorization: `Bearer ${creds.pubBearer}` } : (creds.apiKey ? { "X-API-Key": creds.apiKey } : {})),
     ...(options.headers as Record<string, string> ?? {}),
   };
   const res = await fetch(url, { ...options, headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
@@ -69,14 +90,15 @@ async function opeddFetch(path: string, options: RequestInit = {}): Promise<unkn
 // Last line is typically `{"_meta": {...}}`; surfaced as `meta` field on the
 // returned object so the MCP tool result has both shape pieces inline.
 async function opeddFetchNdjson(
+  creds: Credentials,
   path: string,
   options: RequestInit = {},
 ): Promise<{ articles: unknown[]; meta: unknown }> {
-  const url = `${API_BASE}${path}`;
+  const url = `${creds.apiBase}${path}`;
   const headers: Record<string, string> = {
     Accept: "application/x-ndjson",
     // B91 v0.4.0 (2026-05-26): canonical Bearer preferred; legacy fallback
-    ...(PUB_BEARER ? { Authorization: `Bearer ${PUB_BEARER}` } : (API_KEY ? { "X-API-Key": API_KEY } : {})),
+    ...(creds.pubBearer ? { Authorization: `Bearer ${creds.pubBearer}` } : (creds.apiKey ? { "X-API-Key": creds.apiKey } : {})),
     ...(options.headers as Record<string, string> ?? {}),
   };
   const res = await fetch(url, { ...options, headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
@@ -121,7 +143,8 @@ function err(msg: string): ToolResult {
 
 // ─── Tool definitions ─────────────────────────────────────────────────────────
 
-export const TOOLS: Tool[] = [
+function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?: boolean; pubBearer?: boolean }): Tool[] {
+  const TOOLS: Tool[] = [
   {
     name: "lookup_content",
     description:
@@ -386,7 +409,7 @@ export const TOOLS: Tool[] = [
 ];
 
 // If a buyer token is configured, expose content delivery tooling
-if (BUYER_TOKEN) {
+  if (has.buyerToken) {
   TOOLS.push({
     name: "get_content",
     description:
@@ -415,7 +438,7 @@ if (BUYER_TOKEN) {
 }
 
 // If an enterprise access key is configured, expose feed tools
-if (ACCESS_KEY) {
+  if (has.accessKey) {
   TOOLS.push({
     name: "list_feed",
     description:
@@ -474,7 +497,7 @@ if (ACCESS_KEY) {
 }
 
 // If a Supabase buyer JWT is configured, expose audit + compliance tools
-if (BUYER_JWT) {
+  if (has.buyerJwt) {
   TOOLS.push({
     name: "get_audit_events",
     description:
@@ -596,7 +619,7 @@ if (BUYER_JWT) {
 }
 
 // If a publisher API key is configured, expose publisher-specific tooling
-if (PUB_BEARER || API_KEY) {
+  if (has.pubBearer) {
   TOOLS.push({
     name: "list_publisher_content",
     description:
@@ -665,6 +688,22 @@ if (PUB_BEARER || API_KEY) {
     },
   });
 }
+  return TOOLS;
+}
+
+// stdio: credential-gated list (only tools the local env can use).
+export const TOOLS: Tool[] = buildTools({
+  buyerToken: !!ENV_CREDS.buyerToken,
+  accessKey: !!ENV_CREDS.accessKey,
+  buyerJwt: !!ENV_CREDS.buyerJwt,
+  pubBearer: !!(ENV_CREDS.pubBearer || ENV_CREDS.apiKey),
+});
+
+// hosted gateway: advertise ALL tools; per-request creds decide what
+// actually succeeds (dispatchTool returns a clear error on missing auth).
+export const ALL_TOOLS: Tool[] = buildTools({
+  buyerToken: true, accessKey: true, buyerJwt: true, pubBearer: true,
+});
 
 // ─── MCP Server ───────────────────────────────────────────────────────────────
 
@@ -699,6 +738,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 export async function dispatchTool(
   name: string,
   args: Record<string, unknown>,
+  creds: Credentials = ENV_CREDS,
 ): Promise<ToolResult> {
   try {
     switch (name) {
@@ -708,6 +748,7 @@ export async function dispatchTool(
         if (!url) return err("url is required");
 
         const data = await opeddFetch(
+          creds,
           `/lookup-article?url=${encodeURIComponent(url)}`
         );
         return ok(data);
@@ -739,12 +780,12 @@ export async function dispatchTool(
           return err("Either article_url or article_id is required");
         }
 
-        const buyerEmail = argEmail || BUYER_EMAIL;
+        const buyerEmail = argEmail || creds.buyerEmail;
         if (!buyerEmail) {
           return err("buyer_email is required (or set the OPEDD_BUYER_EMAIL env var)");
         }
 
-        const paymentMethodId = argPm || PAYMENT_METHOD_ID;
+        const paymentMethodId = argPm || creds.paymentMethodId;
         if (!paymentMethodId) {
           return err(
             "payment_method_id is required (or set the OPEDD_PAYMENT_METHOD_ID env var). " +
@@ -762,7 +803,7 @@ export async function dispatchTool(
           ...(intended_use ? { intended_use } : {}),
         };
 
-        const data = await opeddFetch("/agent-purchase", {
+        const data = await opeddFetch(creds, "/agent-purchase", {
           method: "POST",
           body: JSON.stringify(body),
         });
@@ -775,6 +816,7 @@ export async function dispatchTool(
         if (!license_key) return err("license_key is required");
 
         const data = await opeddFetch(
+          creds,
           `/verify-license?key=${encodeURIComponent(license_key)}`
         );
         return ok(data);
@@ -793,7 +835,7 @@ export async function dispatchTool(
         if (article_id) params.set("article_id", article_id);
         params.set("limit", String(Math.min(Number(limit), 50)));
 
-        const data = await opeddFetch(`/registry?${params.toString()}`);
+        const data = await opeddFetch(creds, `/registry?${params.toString()}`);
         return ok(data);
       }
 
@@ -805,7 +847,7 @@ export async function dispatchTool(
         };
         if (!article_id) return err("article_id is required");
 
-        const token = argToken || BUYER_TOKEN;
+        const token = argToken || creds.buyerToken;
         if (!token) {
           return err(
             "buyer_token is required (or set the OPEDD_BUYER_TOKEN env var). " +
@@ -814,6 +856,7 @@ export async function dispatchTool(
         }
 
         const data = await opeddFetch(
+          creds,
           `/content-delivery?article_id=${encodeURIComponent(article_id)}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -837,7 +880,7 @@ export async function dispatchTool(
         if (offset !== undefined) params.set("offset", String(offset));
 
         const query = params.toString();
-        const data = await opeddFetch(`/publisher-directory${query ? `?${query}` : ""}`);
+        const data = await opeddFetch(creds, `/publisher-directory${query ? `?${query}` : ""}`);
         return ok(data);
       }
 
@@ -846,7 +889,7 @@ export async function dispatchTool(
         const { url } = args as { url: string };
         if (!url) return err("url is required");
 
-        const data = await opeddFetch("/detect-platform", {
+        const data = await opeddFetch(creds, "/detect-platform", {
           method: "POST",
           body: JSON.stringify({ url }),
         });
@@ -863,6 +906,7 @@ export async function dispatchTool(
 
         const accept = jsonld ? "application/ld+json" : "application/json";
         const data = await opeddFetch(
+          creds,
           `/rsl-manifest?publisher_id=${encodeURIComponent(publisher_id)}`,
           { headers: { Accept: accept } },
         );
@@ -913,7 +957,7 @@ export async function dispatchTool(
           ...(buyer_webhook_url ? { buyer_webhook_url } : {}),
         };
 
-        const data = await opeddFetch("/enterprise-license", {
+        const data = await opeddFetch(creds, "/enterprise-license", {
           method: "POST",
           body: JSON.stringify(body),
         });
@@ -922,7 +966,7 @@ export async function dispatchTool(
 
       // ── list_feed (Phase 10 + 11) ──────────────────────────────────────────
       case "list_feed": {
-        if (!ACCESS_KEY) {
+        if (!creds.accessKey) {
           return err("OPEDD_ACCESS_KEY env var is required for this tool (ent_* enterprise access key)");
         }
         const { since, cursor, limit = 50 } = args as {
@@ -931,20 +975,20 @@ export async function dispatchTool(
           limit?: number;
         };
         const params = new URLSearchParams({
-          access_key: ACCESS_KEY,
+          access_key: creds.accessKey,
           format: "json",
           limit: String(Math.min(Number(limit) || 50, 200)),
         });
         if (since) params.set("since", since);
         if (cursor) params.set("cursor", cursor);
 
-        const data = await opeddFetch(`/enterprise-license?${params.toString()}`);
+        const data = await opeddFetch(creds, `/enterprise-license?${params.toString()}`);
         return ok(data);
       }
 
       // ── stream_feed_ndjson (Phase 11 M3) ───────────────────────────────────
       case "stream_feed_ndjson": {
-        if (!ACCESS_KEY) {
+        if (!creds.accessKey) {
           return err("OPEDD_ACCESS_KEY env var is required for this tool (ent_* enterprise access key)");
         }
         const { since, cursor, limit = 200 } = args as {
@@ -953,20 +997,20 @@ export async function dispatchTool(
           limit?: number;
         };
         const params = new URLSearchParams({
-          access_key: ACCESS_KEY,
+          access_key: creds.accessKey,
           format: "ndjson",
           limit: String(Math.min(Number(limit) || 200, 1000)),
         });
         if (since) params.set("since", since);
         if (cursor) params.set("cursor", cursor);
 
-        const data = await opeddFetchNdjson(`/enterprise-license?${params.toString()}`);
+        const data = await opeddFetchNdjson(creds, `/enterprise-license?${params.toString()}`);
         return ok(data);
       }
 
       // ── get_audit_events (Phase 9.x + 10 M5 attestation) ───────────────────
       case "get_audit_events": {
-        if (!BUYER_JWT) {
+        if (!creds.buyerJwt) {
           return err("OPEDD_BUYER_JWT env var is required for this tool (Supabase session JWT)");
         }
         const { from, to, event_type, cursor, limit = 50 } = args as {
@@ -984,26 +1028,26 @@ export async function dispatchTool(
         if (event_type) params.set("event_type", event_type);
         if (cursor) params.set("cursor", cursor);
 
-        const data = await opeddFetch(`/buyer-audit?${params.toString()}`, {
-          headers: { Authorization: `Bearer ${BUYER_JWT}` },
+        const data = await opeddFetch(creds, `/buyer-audit?${params.toString()}`, {
+          headers: { Authorization: `Bearer ${creds.buyerJwt}` },
         });
         return ok(data);
       }
 
       // ── get_buyer_account (buyer profile + masked key list) ────────────────
       case "get_buyer_account": {
-        if (!BUYER_JWT) {
+        if (!creds.buyerJwt) {
           return err("OPEDD_BUYER_JWT env var is required for this tool (Supabase session JWT)");
         }
-        const data = await opeddFetch("/buyer-account", {
-          headers: { Authorization: `Bearer ${BUYER_JWT}` },
+        const data = await opeddFetch(creds, "/buyer-account", {
+          headers: { Authorization: `Bearer ${creds.buyerJwt}` },
         });
         return ok(data);
       }
 
       // ── article_53_attestation (Phase 12 Wave 1 W1.4) ──────────────────────
       case "article_53_attestation": {
-        if (!BUYER_JWT) {
+        if (!creds.buyerJwt) {
           return err("OPEDD_BUYER_JWT env var is required for this tool (Supabase session JWT)");
         }
         const { license_id, content_id, window_start, window_end } = args as {
@@ -1025,15 +1069,16 @@ export async function dispatchTool(
         // nonexistent function named "eu-ai-act" and 404'd — this tool had
         // NEVER worked in production until the 2026-07-10 fix (live-probed).
         const data = await opeddFetch(
+          creds,
           `/eu-ai-act-article-53-attestation?${params.toString()}`,
-          { headers: { Authorization: `Bearer ${BUYER_JWT}` } },
+          { headers: { Authorization: `Bearer ${creds.buyerJwt}` } },
         );
         return ok(data);
       }
 
       // ── get_compliance_dossier (Phase 11 M4) ───────────────────────────────
       case "get_compliance_dossier": {
-        if (!BUYER_JWT) {
+        if (!creds.buyerJwt) {
           return err("OPEDD_BUYER_JWT env var is required for this tool (Supabase session JWT)");
         }
         const { from, to, cursor } = args as {
@@ -1051,15 +1096,15 @@ export async function dispatchTool(
         });
         if (cursor) params.set("cursor", cursor);
 
-        const data = await opeddFetch(`/buyer-compliance-report?${params.toString()}`, {
-          headers: { Authorization: `Bearer ${BUYER_JWT}` },
+        const data = await opeddFetch(creds, `/buyer-compliance-report?${params.toString()}`, {
+          headers: { Authorization: `Bearer ${creds.buyerJwt}` },
         });
         return ok(data);
       }
 
       // ── list_publisher_content ─────────────────────────────────────────────
       case "list_publisher_content": {
-        if (!PUB_BEARER && !API_KEY) {
+        if (!creds.pubBearer && !creds.apiKey) {
           return err("OPEDD_PUB_BEARER env var is required for this tool (canonical Bearer; legacy OPEDD_API_KEY also accepted during transition)");
         }
 
@@ -1074,13 +1119,13 @@ export async function dispatchTool(
         params.set("offset", String(Number(offset)));
         if (type) params.set("type", type);
 
-        const data = await opeddFetch(`/api?${params.toString()}`);
+        const data = await opeddFetch(creds, `/api?${params.toString()}`);
         return ok(data);
       }
 
       // ── push_content ───────────────────────────────────────────────────────
       case "push_content": {
-        if (!PUB_BEARER && !API_KEY) {
+        if (!creds.pubBearer && !creds.apiKey) {
           return err("OPEDD_PUB_BEARER env var is required for this tool (your opedd_pub_ publisher key).");
         }
         const { articles } = args as { articles?: unknown[] };
@@ -1092,7 +1137,7 @@ export async function dispatchTool(
         }
         // Backend /publishers-content enforces the full strict schema + returns
         // clear per-article errors; we pass through so the assistant can relay them.
-        const data = await opeddFetch("/publishers-content", {
+        const data = await opeddFetch(creds, "/publishers-content", {
           method: "POST",
           body: JSON.stringify({ articles }),
         });
