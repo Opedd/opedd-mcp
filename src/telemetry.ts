@@ -42,12 +42,14 @@ export function toolCallProperties(
   tool: string,
   durationMs: number,
   ok: boolean,
+  extra?: Record<string, string | number | boolean>,
 ): Record<string, string | number | boolean> {
   return {
     tool,
     duration_ms: Math.round(durationMs),
     ok,
     server_version: SERVER_VERSION,
+    ...extra,
   };
 }
 
@@ -73,13 +75,21 @@ export function initTelemetry(): void {
   }
 }
 
-export function captureToolCall(tool: string, durationMs: number, ok: boolean): void {
+export function captureToolCall(
+  tool: string,
+  durationMs: number,
+  ok: boolean,
+  // Extra event properties (still no params/PII/keys by construction).
+  // The hosted gateway uses this to tag internal probes ({ internal: true })
+  // so channel metrics can be filtered to genuinely external callers.
+  extra?: Record<string, string | number | boolean>,
+): void {
   if (!client) return;
   try {
     client.capture({
       distinctId: sessionId,
       event: "mcp_tool_call",
-      properties: toolCallProperties(tool, durationMs, ok),
+      properties: toolCallProperties(tool, durationMs, ok, extra),
     });
   } catch {
     /* telemetry must never affect a tool call */

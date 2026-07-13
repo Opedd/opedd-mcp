@@ -6,20 +6,20 @@
     "url": "https://github.com/Opedd/opedd-mcp",
     "source": "github"
   },
-  "version": "0.6.6",
+  "version": "0.6.7",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "opedd-mcp",
-      "version": "0.6.6",
+      "version": "0.6.7",
       "transport": {
         "type": "stdio"
       },
       "environmentVariables": [
         {
           "name": "OPEDD_BUYER_EMAIL",
-          "description": "Your email — default buyer identity for purchases",
+          "description": "Your email \u2014 default buyer identity for purchases",
           "isRequired": false,
           "isSecret": false
         },
@@ -31,33 +31,33 @@
         },
         {
           "name": "OPEDD_BUYER_TOKEN",
-          "description": "Buyer API token (opedd_buyer_live_*) — enables licensed content retrieval",
+          "description": "Buyer API token (opedd_buyer_live_*) \u2014 enables licensed content retrieval",
           "isRequired": false,
           "isSecret": true
         },
         {
           "name": "OPEDD_ACCESS_KEY",
-          "description": "Enterprise access key (ent_*) — enables bulk feed tools",
+          "description": "Enterprise access key (ent_*) \u2014 enables bulk feed tools",
           "isRequired": false,
           "isSecret": true
         },
         {
           "name": "OPEDD_BUYER_JWT",
-          "description": "Buyer portal session JWT — enables account, audit, compliance + EU AI Act attestation tools",
+          "description": "Buyer portal session JWT \u2014 enables account, audit, compliance + EU AI Act attestation tools",
           "isRequired": false,
           "isSecret": true
         },
         {
           "name": "OPEDD_PUB_BEARER",
-          "description": "Publisher API key (opedd_pub_*) — enables publisher content push + listing tools",
+          "description": "Publisher API key (opedd_pub_*) \u2014 enables publisher content push + listing tools",
           "isRequired": false,
           "isSecret": true
         }
       ]
     }
   ],
-  "title": "Opedd — Licensed Content for AI",
-  "websiteUrl": "https://opedd.com/for-ai-agents",
+  "title": "Opedd \u2014 Licensed Content for AI",
+  "websiteUrl": "https://opedd.com/for-ai-agents?utm_source=mcp-registry&utm_medium=listing&utm_campaign=mcp",
   "icons": [
     {
       "src": "https://raw.githubusercontent.com/Opedd/opedd-mcp/main/assets/opedd-icon-512.png",

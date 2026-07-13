@@ -18,7 +18,7 @@
 <p align="center">
   <a href="cursor://anysphere.cursor-deeplink/mcp/install?name=opedd&config=eyJjb21tYW5kIjoibnB4IC15IG9wZWRkLW1jcCJ9"><img src="https://img.shields.io/badge/Add%20to-Cursor-000?logo=cursor" alt="Add to Cursor"></a>
   <a href="https://insiders.vscode.dev/redirect/mcp/install?name=opedd&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22opedd-mcp%22%5D%7D"><img src="https://img.shields.io/badge/Install%20in-VS%20Code-007ACC?logo=visualstudiocode" alt="Install in VS Code"></a>
-  <a href="https://opedd.com/for-ai-agents"><img src="https://img.shields.io/badge/Docs-opedd.com-111" alt="Docs"></a>
+  <a href="https://opedd.com/for-ai-agents?utm_source=github&utm_medium=readme&utm_campaign=mcp"><img src="https://img.shields.io/badge/Docs-opedd.com-111" alt="Docs"></a>
 </p>
 
 Lets AI assistants (Claude Desktop, Cursor, Windsurf, or any MCP-compatible host) discover, purchase, and verify content licenses autonomously — mid-conversation, without opening a browser. Every license is registered on-chain (Tempo blockchain) with cryptographic proof.
@@ -31,7 +31,7 @@ Lets AI assistants (Claude Desktop, Cursor, Windsurf, or any MCP-compatible host
 npx opedd-mcp
 ```
 
-Then add it to your MCP host (see [Claude Desktop / Cursor / Windsurf setup](#claude-desktop-setup) below). Discovery + verification tools work with no configuration; purchasing and content retrieval use optional API keys from [opedd.com](https://opedd.com).
+Then add it to your MCP host (see [Claude Desktop / Cursor / Windsurf setup](#claude-desktop-setup) below). Discovery + verification tools work with no configuration; purchasing and content retrieval use optional API keys from [opedd.com](https://opedd.com?utm_source=github&utm_medium=readme&utm_campaign=mcp).
 
 ## Hosted endpoint — no install (mcp.opedd.com)
 
@@ -279,9 +279,9 @@ Opedd is the **licensed content delivery layer** for AI — not just a licensing
 
 ## Learn more
 
-- [Opedd for AI Agents](https://opedd.com/for-ai-agents) — full documentation, code examples, endpoint reference
+- [Opedd for AI Agents](https://opedd.com/for-ai-agents?utm_source=github&utm_medium=readme&utm_campaign=mcp) — full documentation, code examples, endpoint reference
 - [API Docs](https://docs.opedd.com) — OpenAPI spec with agent endpoints
-- [Opedd Registry](https://opedd.com/registry) — browse on-chain license proofs
+- [Opedd Registry](https://opedd.com/registry?utm_source=github&utm_medium=readme&utm_campaign=mcp) — browse on-chain license proofs
 
 ## License
 
