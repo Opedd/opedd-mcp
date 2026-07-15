@@ -723,7 +723,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     request.params.name,
     (request.params.arguments ?? {}) as Record<string, unknown>,
   );
-  captureToolCall(request.params.name, Date.now() - start, result.isError !== true);
+  // channel:"stdio" lets the channel report separate local (npx) usage from
+  // hosted-gateway usage (channel:"gateway"); the Phase-2 hosted trigger
+  // counts only the latter.
+  captureToolCall(request.params.name, Date.now() - start, result.isError !== true, { channel: "stdio" });
   return result;
 });
 
