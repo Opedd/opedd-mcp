@@ -128,7 +128,7 @@ Exposes up to 17 tools to any AI assistant (some are conditional on env vars):
 
 ### Regulatory framing (CDSM Article 4 vs EU AI Act Article 53 — never conflated)
 
-Per the [opedd-backend INVARIANTS.md W1.6 amendment](https://github.com/Opedd/opedd-backend/blob/main/INVARIANTS.md):
+Per Opedd's platform invariants (W1.6 amendment):
 
 - **`rsl_get(publisher_id, jsonld=true)`** → publisher-side **CDSM Article 4(3)** opt-out declaration (signed JSON-LD receipt over the reservation state).
 - **`article_53_attestation(license_id)`** → buyer-side **EU AI Act Article 53** attestation (signed HS256 JWT scoped to one license).
