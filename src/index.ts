@@ -457,7 +457,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
         },
         cursor: {
           type: "string",
-          description: "Opaque cursor from prior response's _meta.next_cursor",
+          description: "Opaque cursor from the prior response's data.pagination.next_cursor",
         },
         limit: {
           type: "number",
@@ -485,7 +485,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
         },
         cursor: {
           type: "string",
-          description: "Opaque cursor from prior response's _meta.next_cursor",
+          description: "Opaque cursor from the prior result's meta.next_cursor",
         },
         limit: {
           type: "number",
