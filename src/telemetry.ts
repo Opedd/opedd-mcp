@@ -44,12 +44,17 @@ export function toolCallProperties(
   ok: boolean,
   extra?: Record<string, string | number | boolean>,
 ): Record<string, string | number | boolean> {
+  // Spread `extra` FIRST so it can never overwrite the privacy-critical /
+  // integrity fields below. Otherwise a future caller passing e.g.
+  // { tool: ... } or { ok: ... } could silently forge metrics or shadow the
+  // canonical fields — the "nothing sensitive by construction" guarantee
+  // must hold even against a coding mistake in a caller.
   return {
+    ...extra,
     tool,
     duration_ms: Math.round(durationMs),
     ok,
     server_version: SERVER_VERSION,
-    ...extra,
   };
 }
 
