@@ -77,7 +77,15 @@ async function opeddFetch(creds: Credentials, path: string, options: RequestInit
     let msg = `HTTP ${res.status}`;
     try {
       const errBody = await res.json();
-      msg = (errBody as any)?.error || (errBody as any)?.message || msg;
+      // Backend envelope upgraded to structured errors ({ error: { code,
+      // message } }); the old string-shape is kept as fallback. Passing the
+      // object into Error() rendered "[object Object]" — every agent-facing
+      // failure was unreadable (launch-gaps follow-on, 2026-07-17).
+      const e = (errBody as any)?.error;
+      msg =
+        (typeof e === "object" && e !== null ? [e.code, e.message].filter(Boolean).join(": ") : e) ||
+        (errBody as any)?.message ||
+        msg;
     } catch {
       // non-JSON error body — keep the HTTP-status default
     }
@@ -106,7 +114,15 @@ async function opeddFetchNdjson(
     let msg = `HTTP ${res.status}`;
     try {
       const errBody = await res.json();
-      msg = (errBody as any)?.error || (errBody as any)?.message || msg;
+      // Backend envelope upgraded to structured errors ({ error: { code,
+      // message } }); the old string-shape is kept as fallback. Passing the
+      // object into Error() rendered "[object Object]" — every agent-facing
+      // failure was unreadable (launch-gaps follow-on, 2026-07-17).
+      const e = (errBody as any)?.error;
+      msg =
+        (typeof e === "object" && e !== null ? [e.code, e.message].filter(Boolean).join(": ") : e) ||
+        (errBody as any)?.message ||
+        msg;
     } catch {
       // non-JSON error body — keep the HTTP-status default
     }
