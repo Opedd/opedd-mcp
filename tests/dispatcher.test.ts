@@ -322,6 +322,7 @@ describe("dispatchTool: purchase_license", () => {
     await dispatchTool("purchase_license", {
       article_id: "art-1",
       license_type: "ai",
+      terms_accepted: true,
     });
     const calls = (f as ReturnType<typeof vi.fn>).mock.calls;
     expect(calls[0][0]).toContain("/agent-purchase");
@@ -331,6 +332,20 @@ describe("dispatchTool: purchase_license", () => {
     expect(body.buyer_email).toBe(TEST_BUYER_EMAIL);
     expect(body.payment.payment_method_id).toBe(TEST_PM_ID);
     expect(body.license_type).toBe("ai");
+    // Fail-closed assent (2026-07-24): the tool stamps the acceptance moment.
+    expect(typeof body.terms_accepted_at).toBe("string");
+    expect(Number.isNaN(Date.parse(body.terms_accepted_at))).toBe(false);
+  });
+
+  it("rejects missing terms_accepted (fail-closed assent)", async () => {
+    mockFetchOk({});
+    const { dispatchTool } = await loadDispatcher();
+    const result = await dispatchTool("purchase_license", {
+      article_id: "art-1",
+      license_type: "ai",
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("terms_accepted");
   });
 
   it("rejects missing article_url AND article_id", async () => {
@@ -348,6 +363,7 @@ describe("dispatchTool: purchase_license", () => {
     const result = await dispatchTool("purchase_license", {
       article_id: "art-1",
       license_type: "ai",
+      terms_accepted: true,
     });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("buyer_email");
