@@ -189,8 +189,14 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "License types: 'human' = republication rights, 'ai' = training dataset rights, 'ai_inference' = inference/RAG rights.",
     inputSchema: {
       type: "object",
-      required: ["license_type"],
+      required: ["license_type", "terms_accepted"],
       properties: {
+        terms_accepted: {
+          type: "boolean",
+          description:
+            "REQUIRED. Set true only after the buyer (your principal) has accepted the Opedd licence terms at opedd.com/terms. " +
+            "The acceptance timestamp is recorded with the licence; purchases without genuine acceptance are rejected.",
+        },
         article_url: {
           type: "string",
           description: "URL of the article to license (use this OR article_id)",
@@ -798,6 +804,12 @@ export async function dispatchTool(
         if (!article_url && !article_id) {
           return err("Either article_url or article_id is required");
         }
+        const termsAccepted = (args as { terms_accepted?: boolean }).terms_accepted;
+        if (termsAccepted !== true) {
+          return err(
+            "terms_accepted must be true — confirm with the buyer that they accept the Opedd licence terms (opedd.com/terms) before purchasing."
+          );
+        }
 
         const buyerEmail = argEmail || creds.buyerEmail;
         if (!buyerEmail) {
@@ -815,6 +827,8 @@ export async function dispatchTool(
         const body: Record<string, unknown> = {
           license_type,
           buyer_email: buyerEmail,
+          // Genuine assent moment: the agent asserted terms_accepted=true just now.
+          terms_accepted_at: new Date().toISOString(),
           payment: { method: "stripe_pm", payment_method_id: paymentMethodId },
           ...(article_id ? { article_id } : { article_url }),
           ...(buyer_name ? { buyer_name } : {}),
