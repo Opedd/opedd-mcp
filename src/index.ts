@@ -1008,14 +1008,17 @@ export async function dispatchTool(
           limit?: number;
         };
         const params = new URLSearchParams({
-          access_key: creds.accessKey,
           format: "json",
           limit: String(Math.min(Number(limit) || 50, 200)),
         });
         if (since) params.set("since", since);
         if (cursor) params.set("cursor", cursor);
 
-        const data = await opeddFetch(creds, `/enterprise-license?${params.toString()}`);
+        // Security 2026-07-27: enterprise key travels in a header, not the
+        // query string (query strings are logged verbatim by proxies/edge).
+        const data = await opeddFetch(creds, `/enterprise-license?${params.toString()}`, {
+          headers: { "X-Enterprise-Key": creds.accessKey },
+        });
         return ok(data);
       }
 
@@ -1030,14 +1033,17 @@ export async function dispatchTool(
           limit?: number;
         };
         const params = new URLSearchParams({
-          access_key: creds.accessKey,
           format: "ndjson",
           limit: String(Math.min(Number(limit) || 200, 1000)),
         });
         if (since) params.set("since", since);
         if (cursor) params.set("cursor", cursor);
 
-        const data = await opeddFetchNdjson(creds, `/enterprise-license?${params.toString()}`);
+        // Security 2026-07-27: enterprise key travels in a header, not the
+        // query string (query strings are logged verbatim by proxies/edge).
+        const data = await opeddFetchNdjson(creds, `/enterprise-license?${params.toString()}`, {
+          headers: { "X-Enterprise-Key": creds.accessKey },
+        });
         return ok(data);
       }
 
