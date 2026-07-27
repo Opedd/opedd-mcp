@@ -217,12 +217,15 @@ describe("dispatchTool: get_compliance_dossier (BUYER_JWT gated)", () => {
 // ───────────────────────────── ACCESS_KEY-gated tools ─────────────────────────────
 
 describe("dispatchTool: list_feed (ACCESS_KEY gated)", () => {
-  it("happy path — sends access_key + format=json", async () => {
+  it("happy path — sends key via X-Enterprise-Key header, not query string", async () => {
     const f = mockFetchOk({ success: true, data: { articles: [] } });
     const { dispatchTool } = await loadDispatcher();
     await dispatchTool("list_feed", { limit: 50 });
     const call = String(f.mock.calls[0][0]);
-    expect(call).toContain("access_key=" + TEST_ACCESS_KEY);
+    // Security 2026-07-27: the key travels in a header now, never the URL.
+    const headers = (f.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    expect(headers["X-Enterprise-Key"]).toBe(TEST_ACCESS_KEY);
+    expect(call).not.toContain("access_key=");
     expect(call).toContain("format=json");
     expect(call).toContain("limit=50");
   });
