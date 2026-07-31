@@ -13,6 +13,12 @@ import { SERVER_VERSION } from "./version.js";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
+// Current Opedd Master Services Agreement version label. MUST match
+// opedd-backend supabase/functions/_shared/msa-version.ts CURRENT_MSA_VERSION
+// (the backend rejects superseded labels). On an MSA version bump, update this
+// constant and cut a new package release.
+export const CURRENT_MSA_VERSION = "master-services-agreement-2026-07-22b";
+
 // ─── Credentials context (2026-07-11 hosted-gateway refactor) ────────────────
 // Credentials travel EXPLICITLY through dispatchTool/opeddFetch instead of
 // module-level env constants. Why: the hosted gateway (mcp.opedd.com) serves
@@ -380,11 +386,18 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "Returns a Stripe client_secret for payment completion + the enterprise_license_id. " +
       "After payment, an ent_* access key is emailed to buyer_email. " +
       "Scopes: 'custom' (pass-through publisher_ids), 'platform_wide' (auto-resolve all opted-in publishers), 'filtered' (Phase 10 filter_rules). " +
-      "License tiers: 'rag' (= ai_retrieval), 'training' (= ai_training, flat-fee not metered), 'inference' (= ai_retrieval), 'full_ai' (writes both retrieval + training records).",
+      "License tiers: 'rag' (= ai_retrieval), 'training' (= ai_training, flat-fee not metered), 'inference' (= ai_retrieval), 'full_ai' (writes both retrieval + training records). " +
+      "The buyer must accept the Opedd Master Services Agreement (opedd.com/terms) before purchase — set terms_accepted=true to record it.",
     inputSchema: {
       type: "object",
-      required: ["publisher_ids", "buyer_email", "buyer_org"],
+      required: ["publisher_ids", "buyer_email", "buyer_org", "terms_accepted"],
       properties: {
+        terms_accepted: {
+          type: "boolean",
+          description:
+            "REQUIRED. Set true only after the buyer (your principal) has accepted the Opedd Master Services Agreement at opedd.com/terms. " +
+            "The current MSA version label is recorded with the licence; purchases without genuine acceptance are rejected (HTTP 400).",
+        },
         publisher_ids: {
           type: "array",
           items: { type: "string" },
@@ -958,6 +971,7 @@ export async function dispatchTool(
           scope = "custom",
           filter_rules,
           buyer_webhook_url,
+          terms_accepted,
         } = args as {
           publisher_ids?: string[];
           buyer_email?: string;
@@ -968,6 +982,7 @@ export async function dispatchTool(
           scope?: string;
           filter_rules?: Record<string, unknown>;
           buyer_webhook_url?: string;
+          terms_accepted?: boolean;
         };
 
         if (!Array.isArray(publisher_ids) || publisher_ids.length === 0) {
@@ -977,6 +992,11 @@ export async function dispatchTool(
         }
         if (!pelEmail) return err("buyer_email is required");
         if (!buyer_org) return err("buyer_org is required");
+        if (terms_accepted !== true) {
+          return err(
+            "terms_accepted must be true — confirm with the buyer that they accept the Opedd Master Services Agreement (opedd.com/terms) before purchasing."
+          );
+        }
 
         const body: Record<string, unknown> = {
           publisher_ids: publisher_ids ?? [],
@@ -986,6 +1006,12 @@ export async function dispatchTool(
           license_tier,
           duration_months,
           scope,
+          // Genuine assent moment: the agent asserted terms_accepted=true just
+          // now. The backend requires the MSA version label (fail-closed since
+          // 2026-07-31) and rejects superseded labels — on an MSA version bump
+          // this constant must be updated (new package release) to match
+          // opedd-backend _shared/msa-version.ts CURRENT_MSA_VERSION.
+          terms_version: CURRENT_MSA_VERSION,
           ...(filter_rules ? { filter_rules } : {}),
           ...(buyer_webhook_url ? { buyer_webhook_url } : {}),
         };
