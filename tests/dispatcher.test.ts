@@ -383,6 +383,7 @@ describe("dispatchTool: purchase_enterprise_license", () => {
       publisher_ids: ["pub-1"],
       buyer_email: "eng@yourlab.com",
       buyer_org: "AI Lab",
+      terms_accepted: true,
     });
     const calls = (f as ReturnType<typeof vi.fn>).mock.calls;
     expect(calls[0][0]).toContain("/enterprise-license");
@@ -390,6 +391,9 @@ describe("dispatchTool: purchase_enterprise_license", () => {
     expect(body.billing_type).toBe("annual");
     expect(body.license_tier).toBe("rag");
     expect(body.scope).toBe("custom");
+    // Fail-closed MSA assent (2026-07-31): the current version label rides
+    // every create so the backend can record provable acceptance.
+    expect(body.terms_version).toMatch(/^master-services-agreement-/);
   });
 
   it("requires publisher_ids for scope='custom'", async () => {
@@ -399,9 +403,23 @@ describe("dispatchTool: purchase_enterprise_license", () => {
       buyer_email: "x",
       buyer_org: "y",
       scope: "custom",
+      terms_accepted: true,
     });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("publisher_ids");
+  });
+
+  it("rejects when terms_accepted is not true (fail-closed MSA assent)", async () => {
+    const f = mockFetchOk({});
+    const { dispatchTool } = await loadDispatcher();
+    const result = await dispatchTool("purchase_enterprise_license", {
+      publisher_ids: ["pub-1"],
+      buyer_email: "eng@yourlab.com",
+      buyer_org: "AI Lab",
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("terms_accepted");
+    expect((f as ReturnType<typeof vi.fn>).mock.calls.length).toBe(0);
   });
 });
 
