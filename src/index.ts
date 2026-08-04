@@ -478,6 +478,9 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
     name: "list_feed",
     description:
       "List articles from a buyer's licensed catalog via GET /enterprise-license (Phase 10 + 11). " +
+      "Content contract: flat-fee scopes (custom/platform_wide) include full content_body; METERED " +
+      "(filtered-scope) keys get a discovery-only feed — content_body is null and content_access is " +
+      "'metered_per_call'; fetch article text via get_content (each retrieval is billed). " +
       "Returns JSON-format response with paginated articles. " +
       "Use `since` (ISO 8601) for delta-feed polling — only articles published after the timestamp. " +
       "Use `cursor` for pagination across pages. " +
@@ -506,6 +509,8 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
     description:
       "Bulk-export a buyer's licensed catalog via GET /enterprise-license?format=ndjson (Phase 11 M3). " +
       "Returns up to 1000 articles per call (collected from line-delimited JSON wire format). " +
+      "Same per-scope content contract as list_feed: METERED (filtered-scope) keys export metadata only " +
+      "(content_body null, content_access 'metered_per_call') — use get_content for article text. " +
       "Each article emits one usage_records row (analytics-only sentinel 'bulk-export:<request_id>:<article_id>' — not metered-billable per the revenue-model bifurcation invariant). " +
       "Use `since` (ISO 8601) for delta-feed. Use `cursor` to paginate beyond 1000. " +
       "Backend supports 5000 articles per call; the MCP cap is 1000 for transport reasonability. " +

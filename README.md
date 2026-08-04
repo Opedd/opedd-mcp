@@ -89,11 +89,11 @@ Exposes up to 17 tools to any AI assistant (some are conditional on env vars):
 | Tool | Description |
 |------|-------------|
 | `lookup_content` | Look up an article by URL — returns title, publisher, pricing |
-| `purchase_license` | Buy a single-article license via Stripe — returns OP-XXXX-XXXX key |
+| `purchase_license` | Buy a single-article license via Stripe — returns OP-XXXX-XXXX key. Requires `terms_accepted: true` (genuine buyer assent to opedd.com/terms; recorded with the licence) |
 | `verify_license` | Verify a license key — returns validity, article, publisher, blockchain proof |
 | `browse_registry` | Browse the public Opedd registry — lists issued LICENSES (use `publisher_directory` to browse publishers themselves) |
 | `publisher_directory` | Browse the public Opedd publisher catalog — paginated publishers with article counts + pricing + sample articles (primary buyer-discovery surface for AI labs) |
-| `purchase_enterprise_license` | Buy a bulk enterprise license covering multiple publishers (Phase 10) — returns Stripe `client_secret` |
+| `purchase_enterprise_license` | Buy a bulk enterprise license covering multiple publishers (Phase 10) — returns Stripe `client_secret`. Requires `terms_accepted: true`; the current Master Services Agreement version label is recorded with the licence (the backend rejects superseded labels) |
 | `rsl_get` | Fetch a publisher's RSL Standard manifest — public discovery surface; `jsonld: true` returns CDSM Article 4(3) signed receipt (Phase 12 W1.1) |
 | `detect_platform` | Detect the content platform behind a URL — returns suggested onboarding workflow for Substack / Beehiiv / Ghost / Medium / Brevo / custom (Phase 12 W3.1) |
 
@@ -107,8 +107,8 @@ Exposes up to 17 tools to any AI assistant (some are conditional on env vars):
 
 | Tool | Description |
 |------|-------------|
-| `list_feed` | List articles from a buyer's licensed catalog with `since` delta-feed support (Phase 11 M5) |
-| `stream_feed_ndjson` | Bulk-export up to 1000 articles per call via NDJSON wire format (Phase 11 M3) |
+| `list_feed` | List articles from a buyer's licensed catalog with `since` delta-feed support (Phase 11 M5). Flat-fee scopes carry full `content_body`; metered (filtered-scope) keys get a discovery-only feed (`content_body: null`, `content_access: "metered_per_call"`) — fetch text via `get_content` (billed per call) |
+| `stream_feed_ndjson` | Bulk-export up to 1000 articles per call via NDJSON wire format (Phase 11 M3). Same per-scope content contract as `list_feed` — metered keys export metadata only |
 
 **Requires `OPEDD_BUYER_JWT` (Supabase JWT) — buyer account + audit + compliance + EU AI Act surfaces**
 
@@ -266,7 +266,7 @@ npm run build # compiles to dist/
 | | Opedd | Generic search APIs |
 |---|---|---|
 | **What you get** | Licensed content + license key + on-chain proof — all in one API call | Scraped web content, no rights |
-| **Content delivery** | Full article text delivered via API (JSON), real-time feed via webhooks | Scraped snippets or full-page dumps |
+| **Content delivery** | Full article text via API (JSON) — bulk on flat-fee licenses, per-call (metered) on filtered licenses; real-time feed via webhooks | Scraped snippets or full-page dumps |
 | **Content quality** | Curated publisher content (niche B2B newsletters, expert analysis) | Whatever's on the open web |
 | **Rights** | Verifiable license key per article, publisher-authorized | No rights clearance |
 | **Proof** | On-chain (Tempo blockchain) — independently verifiable | None |
