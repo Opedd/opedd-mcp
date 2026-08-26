@@ -101,6 +101,34 @@ export function captureToolCall(
   }
 }
 
+// Client-framework identification (2026-08-26). The MCP initialize request
+// carries the client's SELF-DECLARED name/version (e.g. "claude-desktop",
+// "cursor", a company's custom agent) — the only identity signal the
+// protocol offers, and we were discarding it while trying to identify
+// callers by city. Same privacy posture as tool calls: these two strings
+// plus the caller-supplied extra (geo/channel) only — no params, PII, keys.
+export function captureClientConnect(
+  clientName: string,
+  clientVersion: string,
+  extra?: Record<string, string | number | boolean>,
+): void {
+  if (!client) return;
+  try {
+    client.capture({
+      distinctId: sessionId,
+      event: "mcp_client_connect",
+      properties: {
+        ...(extra ?? {}),
+        client_name: clientName.slice(0, 120),
+        client_version: clientVersion.slice(0, 40),
+        server_version: SERVER_VERSION,
+      },
+    });
+  } catch {
+    /* telemetry must never affect a request */
+  }
+}
+
 export async function shutdownTelemetry(): Promise<void> {
   const c = client;
   client = null;
