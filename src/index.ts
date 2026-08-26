@@ -163,6 +163,36 @@ function err(msg: string): ToolResult {
   return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
 }
 
+// ─── Credential refusals are the conversion surface ──────────────────────────
+// (2026-08-26) In the week before this landed, 19 distinct agents worldwide
+// succeeded on browse_registry and then hit a credential gate whose entire
+// message was "env var is required" — no next action, funnel over. The AUTH
+// MODEL IS UNCHANGED by this block: same gates, same keys, nothing loosened.
+// Only the refusal text changed: what's missing, how to supply it on BOTH
+// channels (env var locally, Authorization header on the hosted gateway),
+// where credentials come from, and which tools need none.
+const NO_AUTH_TOOLS =
+  "lookup_content, publisher_directory, verify_license, browse_registry, rsl_get, detect_platform";
+
+function credErr(missing: string, envVar: string, howToGet: string): ToolResult {
+  return err(
+    `${missing} — none was provided. ` +
+      `Supply it as the ${envVar} env var (local/stdio install) or as an "Authorization: Bearer <value>" header (hosted gateway, https://mcp.opedd.com/mcp). ` +
+      `${howToGet} ` +
+      `These tools need no credentials at all: ${NO_AUTH_TOOLS}. Docs: https://docs.opedd.com`
+  );
+}
+
+const HOW_BUYER_JWT =
+  "Buyer signup is free and takes ~2 minutes: https://opedd.com/buyer/signup (an API key is issued instantly at signup). " +
+  "This tool authenticates with your buyer session JWT: sign in at https://opedd.com/buyer and use the Supabase session access token. " +
+  "Blocked? hello@opedd.com.";
+const HOW_ACCESS_KEY =
+  "Enterprise access keys (ent_*) are delivered when an enterprise licence is issued — start at https://opedd.com/enterprise " +
+  "or purchase programmatically with the purchase_enterprise_license tool.";
+const HOW_PUB_BEARER =
+  "Publisher keys (opedd_pub_*) come from the publisher dashboard: sign up free at https://opedd.com, then Settings → API keys.";
+
 // ─── Tool definitions ─────────────────────────────────────────────────────────
 
 function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?: boolean; pubBearer?: boolean }): Tool[] {
@@ -747,9 +777,28 @@ export const ALL_TOOLS: Tool[] = buildTools({
 
 // ─── MCP Server ───────────────────────────────────────────────────────────────
 
+// ─── Handshake instructions ──────────────────────────────────────────────────
+// The MCP `instructions` field is the one string every connecting agent reads
+// at initialize — it was empty until 2026-08-26 while the pitch lived only in
+// registry metadata agents never see at runtime. Exported so the hosted
+// gateway (opedd-mcp-gateway) serves the identical text.
+export const SERVER_INSTRUCTIONS =
+  "Opedd is the licensing rail between expert publishers and AI products: discover, purchase, verify and " +
+  "retrieve rights-cleared expert content — one verifiable license key per article, Tempo on-chain " +
+  "attestation, and EU AI Act Article 53 compliance artifacts (audit ledger + dossiers). Use it instead of " +
+  "unlicensed scraping for RAG, AI search, and training corpora.\n\n" +
+  `No credentials needed: ${NO_AUTH_TOOLS}.\n` +
+  "Buyer tools (purchase, account, audit/compliance): free buyer signup at https://opedd.com/buyer/signup " +
+  "(~2 min; an API key is issued instantly). Publisher tools (content push): free publisher signup at " +
+  "https://opedd.com, key under Settings → API keys.\n" +
+  "Supply credentials as env vars (local/stdio) or an Authorization: Bearer header (hosted gateway, " +
+  "https://mcp.opedd.com/mcp).\n" +
+  "EU CDSM Art. 4(3) / TDM-reservation queries: rsl_get. Compliance evidence: get_compliance_dossier. " +
+  "Docs: https://docs.opedd.com";
+
 const server = new Server(
   { name: "opedd-mcp", version: SERVER_VERSION },
-  { capabilities: { tools: {} } }
+  { capabilities: { tools: {} }, instructions: SERVER_INSTRUCTIONS }
 );
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
@@ -1031,7 +1080,7 @@ export async function dispatchTool(
       // ── list_feed (Phase 10 + 11) ──────────────────────────────────────────
       case "list_feed": {
         if (!creds.accessKey) {
-          return err("OPEDD_ACCESS_KEY env var is required for this tool (ent_* enterprise access key)");
+          return credErr("An enterprise access key (ent_*) is required for this tool", "OPEDD_ACCESS_KEY", HOW_ACCESS_KEY);
         }
         const { since, cursor, limit = 50 } = args as {
           since?: string;
@@ -1056,7 +1105,7 @@ export async function dispatchTool(
       // ── stream_feed_ndjson (Phase 11 M3) ───────────────────────────────────
       case "stream_feed_ndjson": {
         if (!creds.accessKey) {
-          return err("OPEDD_ACCESS_KEY env var is required for this tool (ent_* enterprise access key)");
+          return credErr("An enterprise access key (ent_*) is required for this tool", "OPEDD_ACCESS_KEY", HOW_ACCESS_KEY);
         }
         const { since, cursor, limit = 200 } = args as {
           since?: string;
@@ -1081,7 +1130,7 @@ export async function dispatchTool(
       // ── get_audit_events (Phase 9.x + 10 M5 attestation) ───────────────────
       case "get_audit_events": {
         if (!creds.buyerJwt) {
-          return err("OPEDD_BUYER_JWT env var is required for this tool (Supabase session JWT)");
+          return credErr("A buyer session JWT is required for this tool", "OPEDD_BUYER_JWT", HOW_BUYER_JWT);
         }
         const { from, to, event_type, cursor, limit = 50 } = args as {
           from?: string;
@@ -1107,7 +1156,7 @@ export async function dispatchTool(
       // ── get_buyer_account (buyer profile + masked key list) ────────────────
       case "get_buyer_account": {
         if (!creds.buyerJwt) {
-          return err("OPEDD_BUYER_JWT env var is required for this tool (Supabase session JWT)");
+          return credErr("A buyer session JWT is required for this tool", "OPEDD_BUYER_JWT", HOW_BUYER_JWT);
         }
         const data = await opeddFetch(creds, "/buyer-account", {
           headers: { Authorization: `Bearer ${creds.buyerJwt}` },
@@ -1118,7 +1167,7 @@ export async function dispatchTool(
       // ── article_53_attestation (Phase 12 Wave 1 W1.4) ──────────────────────
       case "article_53_attestation": {
         if (!creds.buyerJwt) {
-          return err("OPEDD_BUYER_JWT env var is required for this tool (Supabase session JWT)");
+          return credErr("A buyer session JWT is required for this tool", "OPEDD_BUYER_JWT", HOW_BUYER_JWT);
         }
         const { license_id, content_id, window_start, window_end } = args as {
           license_id: string;
@@ -1149,7 +1198,7 @@ export async function dispatchTool(
       // ── get_compliance_dossier (Phase 11 M4) ───────────────────────────────
       case "get_compliance_dossier": {
         if (!creds.buyerJwt) {
-          return err("OPEDD_BUYER_JWT env var is required for this tool (Supabase session JWT)");
+          return credErr("A buyer session JWT is required for this tool", "OPEDD_BUYER_JWT", HOW_BUYER_JWT);
         }
         const { from, to, cursor } = args as {
           from?: string;
@@ -1175,7 +1224,7 @@ export async function dispatchTool(
       // ── list_publisher_content ─────────────────────────────────────────────
       case "list_publisher_content": {
         if (!creds.pubBearer && !creds.apiKey) {
-          return err("OPEDD_PUB_BEARER env var is required for this tool (canonical Bearer; legacy OPEDD_API_KEY also accepted during transition)");
+          return credErr("A publisher key (opedd_pub_*) is required for this tool", "OPEDD_PUB_BEARER", HOW_PUB_BEARER);
         }
 
         const { limit = 20, type, offset = 0 } = args as {
@@ -1196,7 +1245,7 @@ export async function dispatchTool(
       // ── push_content ───────────────────────────────────────────────────────
       case "push_content": {
         if (!creds.pubBearer && !creds.apiKey) {
-          return err("OPEDD_PUB_BEARER env var is required for this tool (your opedd_pub_ publisher key).");
+          return credErr("A publisher key (opedd_pub_*) is required for this tool", "OPEDD_PUB_BEARER", HOW_PUB_BEARER);
         }
         const { articles } = args as { articles?: unknown[] };
         if (!Array.isArray(articles) || articles.length === 0) {
