@@ -90,7 +90,9 @@ describe("TOOLS array (metadata)", () => {
   it("every tool carries name + description + inputSchema", async () => {
     const { TOOLS } = await loadDispatcher();
     for (const tool of TOOLS) {
-      expect(tool.name).toMatch(/^[a-z_]+$/);
+      // digits allowed since article_53_attestation became visible with a
+      // buyer token alone (0.6.15 scoped-keys visibility widening)
+      expect(tool.name).toMatch(/^[a-z0-9_]+$/);
       expect(typeof tool.description).toBe("string");
       expect(tool.description.length).toBeGreaterThan(20);
       expect(tool.inputSchema).toBeDefined();

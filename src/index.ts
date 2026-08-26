@@ -187,6 +187,20 @@ const HOW_BUYER_JWT =
   "Buyer signup is free and takes ~2 minutes: https://opedd.com/buyer/signup (an API key is issued instantly at signup). " +
   "This tool authenticates with your buyer session JWT: sign in at https://opedd.com/buyer and use the Supabase session access token. " +
   "Blocked? hello@opedd.com.";
+// Phase 3 scoped keys (2026-08-26, backend PR #336): the three audit/
+// compliance read surfaces also accept a buyer API key carrying the 'audit'
+// scope. The key (OPEDD_BUYER_TOKEN) is long-lived and portal-manageable —
+// the credential agents can actually hold; the JWT path stays for sessions.
+const HOW_AUDIT_CRED =
+  "EITHER a buyer API key with the 'audit' scope (create one free: https://opedd.com/buyer/signup, then " +
+  "Account \u2192 API keys \u2192 Create \u2192 tick 'Audit & compliance access'; supply it as OPEDD_BUYER_TOKEN or the " +
+  "Authorization header) OR a buyer portal session JWT (OPEDD_BUYER_JWT). Blocked? hello@opedd.com.";
+
+function auditCred(creds: Credentials): string | undefined {
+  // Key preferred (durable, revocable, scope-checked server-side); JWT kept.
+  return creds.buyerToken || creds.buyerJwt;
+}
+
 const HOW_ACCESS_KEY =
   "Enterprise access keys (ent_*) are delivered when an enterprise licence is issued — start at https://opedd.com/enterprise " +
   "or purchase programmatically with the purchase_enterprise_license tool.";
@@ -566,8 +580,11 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   });
 }
 
-// If a Supabase buyer JWT is configured, expose audit + compliance tools
-  if (has.buyerJwt) {
+// Expose audit + compliance tools when buyer credentials exist. Since the
+// 2026-08-26 scoped-keys change (backend #336) an 'audit'-scoped buyer API
+// key (OPEDD_BUYER_TOKEN) works on 3 of these 4; get_buyer_account remains
+// JWT-only (its endpoint mints keys — a key must never mint keys).
+  if (has.buyerJwt || has.buyerToken) {
   TOOLS.push({
     name: "get_audit_events",
     description:
@@ -576,7 +593,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "Optional filter by event_type ('content_access', 'bulk_content_access', 'compliance_report_generated'). " +
       "Window cap 30 days (vs 90-day cap on get_compliance_dossier). " +
       "Attestation inclusion proof is included on every row by default — no separate flag needed (M6.4 consolidation per founder ratification: tools 4 + 6 merged into one cleaner mental model). " +
-      "Requires OPEDD_BUYER_JWT (Supabase session JWT from the buyer portal).",
+      "Auth: an audit-scoped buyer API key (OPEDD_BUYER_TOKEN — create at opedd.com/buyer, Account \u2192 API keys) or OPEDD_BUYER_JWT.",
     inputSchema: {
       type: "object",
       properties: {
@@ -614,7 +631,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "Use cases: post-signup verification ('what was just issued to me?'), buyer dashboard mental model " +
       "('what licenses do I currently hold?'), audit prep ('show me the key list before rotation'). " +
       "For full mid-lifecycle license details (filter_rules, billing, payouts), buyers consult the buyer portal at opedd.com/buyer. " +
-      "Requires OPEDD_BUYER_JWT.",
+      "Requires OPEDD_BUYER_JWT (JWT-only by design: this surface manages API keys, and a key must never mint keys).",
     inputSchema: {
       type: "object",
       properties: {},
@@ -633,7 +650,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "transparency obligation). It does NOT discharge a publisher's CDSM Article 4(3) reservation obligation — " +
       "that lives on the rsl_get tool (jsonld=true variant). Never conflate. " +
       "Optional `content_id` scopes the attestation to one article; default is license-wide. " +
-      "Window cap: 365 days. Requires OPEDD_BUYER_JWT.",
+      "Window cap: 365 days. Auth: an audit-scoped buyer API key (OPEDD_BUYER_TOKEN) or OPEDD_BUYER_JWT.",
     inputSchema: {
       type: "object",
       required: ["license_id"],
@@ -666,7 +683,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "Self-audit invariant: every successful call writes one license_events row with event_type='compliance_report_generated' BEFORE returning. " +
       "Window cap: 90 days per call (vs 30-day cap on get_audit_events). For annual audits, paginate via _meta.next_cursor across 4 quarterly windows. " +
       "Compliance framework anchors (boolean flags) map to EU AI Act Article 53, CDSM Article 4(3), on-chain attestation, TDM reservation. " +
-      "Requires OPEDD_BUYER_JWT.",
+      "Auth: an audit-scoped buyer API key (OPEDD_BUYER_TOKEN) or OPEDD_BUYER_JWT.",
     inputSchema: {
       type: "object",
       required: ["from", "to"],
@@ -1129,8 +1146,8 @@ export async function dispatchTool(
 
       // ── get_audit_events (Phase 9.x + 10 M5 attestation) ───────────────────
       case "get_audit_events": {
-        if (!creds.buyerJwt) {
-          return credErr("A buyer session JWT is required for this tool", "OPEDD_BUYER_JWT", HOW_BUYER_JWT);
+        if (!auditCred(creds)) {
+          return credErr("Buyer credentials are required for this tool", "OPEDD_BUYER_TOKEN (audit-scoped key) or OPEDD_BUYER_JWT", HOW_AUDIT_CRED);
         }
         const { from, to, event_type, cursor, limit = 50 } = args as {
           from?: string;
@@ -1148,7 +1165,7 @@ export async function dispatchTool(
         if (cursor) params.set("cursor", cursor);
 
         const data = await opeddFetch(creds, `/buyer-audit?${params.toString()}`, {
-          headers: { Authorization: `Bearer ${creds.buyerJwt}` },
+          headers: { Authorization: `Bearer ${auditCred(creds)}` },
         });
         return ok(data);
       }
@@ -1166,8 +1183,8 @@ export async function dispatchTool(
 
       // ── article_53_attestation (Phase 12 Wave 1 W1.4) ──────────────────────
       case "article_53_attestation": {
-        if (!creds.buyerJwt) {
-          return credErr("A buyer session JWT is required for this tool", "OPEDD_BUYER_JWT", HOW_BUYER_JWT);
+        if (!auditCred(creds)) {
+          return credErr("Buyer credentials are required for this tool", "OPEDD_BUYER_TOKEN (audit-scoped key) or OPEDD_BUYER_JWT", HOW_AUDIT_CRED);
         }
         const { license_id, content_id, window_start, window_end } = args as {
           license_id: string;
@@ -1190,15 +1207,15 @@ export async function dispatchTool(
         const data = await opeddFetch(
           creds,
           `/eu-ai-act-article-53-attestation?${params.toString()}`,
-          { headers: { Authorization: `Bearer ${creds.buyerJwt}` } },
+          { headers: { Authorization: `Bearer ${auditCred(creds)}` } },
         );
         return ok(data);
       }
 
       // ── get_compliance_dossier (Phase 11 M4) ───────────────────────────────
       case "get_compliance_dossier": {
-        if (!creds.buyerJwt) {
-          return credErr("A buyer session JWT is required for this tool", "OPEDD_BUYER_JWT", HOW_BUYER_JWT);
+        if (!auditCred(creds)) {
+          return credErr("Buyer credentials are required for this tool", "OPEDD_BUYER_TOKEN (audit-scoped key) or OPEDD_BUYER_JWT", HOW_AUDIT_CRED);
         }
         const { from, to, cursor } = args as {
           from?: string;
@@ -1216,7 +1233,7 @@ export async function dispatchTool(
         if (cursor) params.set("cursor", cursor);
 
         const data = await opeddFetch(creds, `/buyer-compliance-report?${params.toString()}`, {
-          headers: { Authorization: `Bearer ${creds.buyerJwt}` },
+          headers: { Authorization: `Bearer ${auditCred(creds)}` },
         });
         return ok(data);
       }
