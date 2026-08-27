@@ -31,7 +31,7 @@ export interface Credentials {
   apiBase: string;
   buyerEmail?: string;
   paymentMethodId?: string;
-  /** canonical opedd_pub_<env>_<32-hex> key */
+  /** canonical opedd_sk_<32-hex> key (legacy opedd_pub_ accepted) */
   pubBearer?: string;
   /** LEGACY op_<32-hex> — retiring per backend Phase C */
   apiKey?: string;
@@ -205,7 +205,7 @@ const HOW_ACCESS_KEY =
   "Enterprise access keys (ent_*) are delivered when an enterprise licence is issued — start at https://opedd.com/enterprise " +
   "or purchase programmatically with the purchase_enterprise_license tool.";
 const HOW_PUB_BEARER =
-  "Publisher keys (opedd_pub_*) come from the publisher dashboard: sign up free at https://opedd.com, then Settings → API keys.";
+  "Publisher keys (opedd_sk_*, legacy opedd_pub_* still valid) come from the publisher dashboard: sign up free at https://opedd.com, then Settings → API keys.";
 
 // ─── Tool definitions ─────────────────────────────────────────────────────────
 
@@ -738,7 +738,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   TOOLS.push({
     name: "push_content",
     description:
-      "Push your published articles to Opedd so they can be licensed to AI buyers (requires OPEDD_PUB_BEARER — your opedd_pub_ publisher key). " +
+      "Push your published articles to Opedd so they can be licensed to AI buyers (requires OPEDD_PUB_BEARER — your opedd_sk_ publisher key). " +
       "Send 1–100 articles per call; batch larger back-catalogues into multiple calls. Each article needs title, url, and html_body — everything else is optional (published_at defaults to now). " +
       "This is the supply-side companion to list_publisher_content: use it to onboard your archive or push new content with no code, straight from your AI assistant.",
     inputSchema: {
@@ -1241,7 +1241,7 @@ export async function dispatchTool(
       // ── list_publisher_content ─────────────────────────────────────────────
       case "list_publisher_content": {
         if (!creds.pubBearer && !creds.apiKey) {
-          return credErr("A publisher key (opedd_pub_*) is required for this tool", "OPEDD_PUB_BEARER", HOW_PUB_BEARER);
+          return credErr("A publisher key (opedd_sk_*) is required for this tool", "OPEDD_PUB_BEARER", HOW_PUB_BEARER);
         }
 
         const { limit = 20, type, offset = 0 } = args as {
@@ -1262,7 +1262,7 @@ export async function dispatchTool(
       // ── push_content ───────────────────────────────────────────────────────
       case "push_content": {
         if (!creds.pubBearer && !creds.apiKey) {
-          return credErr("A publisher key (opedd_pub_*) is required for this tool", "OPEDD_PUB_BEARER", HOW_PUB_BEARER);
+          return credErr("A publisher key (opedd_sk_*) is required for this tool", "OPEDD_PUB_BEARER", HOW_PUB_BEARER);
         }
         const { articles } = args as { articles?: unknown[] };
         if (!Array.isArray(articles) || articles.length === 0) {
