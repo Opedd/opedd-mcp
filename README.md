@@ -88,6 +88,7 @@ Exposes up to 17 tools to any AI assistant (some are conditional on env vars):
 
 | Tool | Description |
 |------|-------------|
+| `search_content` | Full-text search across everything licensable (v0.8.0) — ranked matches with publisher, prices, word count and a description snippet; quotes for phrases, `-word` to exclude |
 | `lookup_content` | Look up an article by URL — returns title, publisher, pricing |
 | `purchase_license` | Buy a single-article license via Stripe — returns OP-XXXX-XXXX key. Requires `terms_accepted: true` (genuine buyer assent to opedd.com/terms; recorded with the licence) |
 | `verify_license` | Verify a license key — returns validity, article, publisher, blockchain proof |

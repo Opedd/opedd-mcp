@@ -84,7 +84,7 @@ describe("TOOLS array with all env vars set", () => {
     // API_KEY-gated (publisher-side: list + push)
     expect(names).toContain("list_publisher_content");
     expect(names).toContain("push_content");
-    expect(names.length).toBe(17);
+    expect(names.length).toBe(18);
   });
 });
 
@@ -332,6 +332,30 @@ describe("dispatchTool: list_publisher_content (PUB_BEARER preferred; API_KEY fa
     const parsed = JSON.parse(result.content[0].text);
     expect(parsed.article.content_body).toHaveLength(9_000);
     expect(parsed.article.body_truncated).toBe(false);
+  });
+});
+
+describe("dispatchTool: search_content (public, no key)", () => {
+  it("GETs /api?action=search with the query, clamps limit, unwraps the envelope", async () => {
+    const f = mockFetchOk({ success: true, data: { query: "chips", results: [{ id: "a", title: "T" }], total: 1, limit: 50 } });
+    const { dispatchTool } = await loadDispatcher();
+    const result = await dispatchTool("search_content", { query: "  chips  export  ", limit: 999, publisher: "acme" });
+    const url = String(f.mock.calls[0][0]);
+    expect(url).toContain("/api?action=search");
+    expect(url).toContain("q=chips+export");
+    expect(url).toContain("limit=50");
+    expect(url).toContain("publisher=acme");
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.results).toHaveLength(1);
+    expect(parsed.total).toBe(1);
+  });
+
+  it("rejects an empty or over-long query before calling the API", async () => {
+    const f = mockFetchOk({});
+    const { dispatchTool } = await loadDispatcher();
+    expect((await dispatchTool("search_content", { query: "   " })).isError).toBe(true);
+    expect((await dispatchTool("search_content", { query: "x".repeat(201) })).isError).toBe(true);
+    expect(f).not.toHaveBeenCalled();
   });
 });
 
