@@ -230,6 +230,23 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
     },
   },
   {
+    name: "search_content",
+    description:
+      "Full-text search across everything licensable on Opedd (public, no key needed). " +
+      "Ask in plain words or use quotes for phrases and -word to exclude. Returns ranked matches with the publisher, " +
+      "prices, word count and a short description snippet (never the body). Use it to answer 'does Opedd have coverage on X', " +
+      "then lookup_content or get_content for a specific article.",
+    inputSchema: {
+      type: "object",
+      required: ["query"],
+      properties: {
+        query: { type: "string", description: "Search words (max 200 characters)." },
+        limit: { type: "number", description: "Max results (default 20, max 50)." },
+        publisher: { type: "string", description: "Optional publisher slug to search within." },
+      },
+    },
+  },
+  {
     name: "purchase_license",
     description:
       "Purchase a content license from the Opedd protocol using a Stripe payment method. " +
@@ -875,6 +892,19 @@ export async function dispatchTool(
           `/lookup-article?url=${encodeURIComponent(url)}`
         );
         return ok(data);
+      }
+
+      // ── search_content ─────────────────────────────────────────────────────
+      case "search_content": {
+        const { query, limit, publisher } = args as { query?: string; limit?: number; publisher?: string };
+        const q = (query ?? "").replace(/\s+/g, " ").trim();
+        if (!q) return err("query is required");
+        if (q.length > 200) return err("query must be at most 200 characters");
+        const params = new URLSearchParams({ action: "search", q });
+        if (typeof limit === "number" && Number.isFinite(limit)) params.set("limit", String(Math.min(Math.max(Math.trunc(limit), 1), 50)));
+        if (typeof publisher === "string" && publisher.trim()) params.set("publisher", publisher.trim());
+        const envelope = (await opeddFetch(creds, `/api?${params.toString()}`)) as { data?: unknown };
+        return ok(envelope.data ?? envelope);
       }
 
       // ── purchase_license ───────────────────────────────────────────────────
