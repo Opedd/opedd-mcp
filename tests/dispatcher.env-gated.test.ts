@@ -291,6 +291,48 @@ describe("dispatchTool: list_publisher_content (PUB_BEARER preferred; API_KEY fa
     const call = String(f.mock.calls[0][0]);
     expect(call).toContain("limit=100");
   });
+
+  // include_body (2026-09-14): routes to the owner read model GET
+  // /publishers-content, unwraps the envelope, truncates bodies at 8,000.
+  it("include_body=true → GET /publishers-content, envelope unwrapped, body truncated at 8,000", async () => {
+    const long = "x".repeat(9_000);
+    const f = mockFetchOk({
+      success: true,
+      data: {
+        articles: [
+          { id: "a", source_url: "https://p.example/a", content_body: long },
+          { id: "b", source_url: "https://p.example/b", content_body: "short" },
+        ],
+        pagination: { limit: 20, next_cursor: "abc", has_more: true },
+        include_body: true,
+      },
+    });
+    const { dispatchTool } = await loadDispatcher();
+    const result = await dispatchTool("list_publisher_content", { include_body: true, limit: 50, cursor: "prev" });
+    const url = String(f.mock.calls[0][0]);
+    expect(url).toContain("/publishers-content?");
+    expect(url).toContain("include_body=true");
+    expect(url).toContain("limit=20"); // capped with bodies
+    expect(url).toContain("cursor=prev");
+    expect((f.mock.calls[0][1] as RequestInit).method ?? "GET").toBe("GET");
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.articles).toHaveLength(2);
+    expect(parsed.articles[0].content_body).toHaveLength(8_000);
+    expect(parsed.articles[0]).toMatchObject({ body_truncated: true, body_length: 9_000 });
+    expect(parsed.articles[1]).toMatchObject({ content_body: "short", body_truncated: false, body_length: 5 });
+    expect(parsed.pagination).toEqual({ limit: 20, next_cursor: "abc", has_more: true });
+  });
+
+  it("include_body=true with id → single article, full body", async () => {
+    const long = "y".repeat(9_000);
+    const f = mockFetchOk({ success: true, data: { article: { id: "a", content_body: long }, include_body: true } });
+    const { dispatchTool } = await loadDispatcher();
+    const result = await dispatchTool("list_publisher_content", { include_body: true, id: "a" });
+    expect(String(f.mock.calls[0][0])).toContain("id=a");
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.article.content_body).toHaveLength(9_000);
+    expect(parsed.article.body_truncated).toBe(false);
+  });
 });
 
 describe("dispatchTool: push_content (PUB_BEARER gated)", () => {
