@@ -712,22 +712,36 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
     description:
       "List all licensable articles for the authenticated publisher (requires OPEDD_PUB_BEARER, or legacy OPEDD_API_KEY). " +
       "Returns articles with titles, descriptions, pricing, and sales statistics. " +
+      "Set include_body=true to read back the STORED article text exactly as licensed buyers receive it " +
+      "(this is how you check that a push_content call stored what you meant; bodies are truncated to 8,000 characters per article, page size 20, paginate with cursor). " +
       "Use article IDs from this list to purchase licenses via purchase_license.",
     inputSchema: {
       type: "object",
       properties: {
         limit: {
           type: "number",
-          description: "Number of results (default: 20, max: 100)",
+          description: "Number of results (default: 20, max: 100; max 20 when include_body is true)",
         },
         type: {
           type: "string",
           enum: ["human", "ai"],
-          description: "Filter by license type availability",
+          description: "Filter by license type availability (ignored when include_body is true)",
         },
         offset: {
           type: "number",
-          description: "Pagination offset (default: 0)",
+          description: "Pagination offset (default: 0; ignored when include_body is true — use cursor)",
+        },
+        include_body: {
+          type: "boolean",
+          description: "Return each article's stored body (what buyers receive). Default false.",
+        },
+        cursor: {
+          type: "string",
+          description: "Opaque next_cursor from a previous include_body=true call.",
+        },
+        id: {
+          type: "string",
+          description: "With include_body=true: fetch exactly one of your articles by id (full body, no truncation).",
         },
       },
     },
@@ -1244,11 +1258,45 @@ export async function dispatchTool(
           return credErr("A publisher key (opedd_sk_*) is required for this tool", "OPEDD_PUB_BEARER", HOW_PUB_BEARER);
         }
 
-        const { limit = 20, type, offset = 0 } = args as {
+        const { limit = 20, type, offset = 0, include_body, cursor, id } = args as {
           limit?: number;
           type?: string;
           offset?: number;
+          include_body?: boolean;
+          cursor?: string;
+          id?: string;
         };
+
+        // include_body (2026-09-14): the OWNER read model — GET /publishers-content
+        // returns the stored body for the key's own rows. Bodies are truncated
+        // here to keep the assistant's context bounded; ?id= returns one in full.
+        if (include_body === true) {
+          const q = new URLSearchParams({ include_body: "true" });
+          if (typeof id === "string" && id) q.set("id", id);
+          else {
+            q.set("limit", String(Math.min(Math.max(Number(limit) || 20, 1), 20)));
+            if (typeof cursor === "string" && cursor) q.set("cursor", cursor);
+          }
+          // Backend envelope is { success, data: {...} }; unwrap so the assistant
+          // sees the payload, not the wrapper (envelope-unwrap rule).
+          const envelope = (await opeddFetch(creds, `/publishers-content?${q.toString()}`)) as {
+            data?: {
+              article?: Record<string, unknown>;
+              articles?: Array<Record<string, unknown>>;
+              pagination?: unknown;
+            };
+          };
+          const data = envelope.data ?? {};
+          const MAX = 8_000;
+          const trim = (a: Record<string, unknown>) => {
+            const body = typeof a.content_body === "string" ? a.content_body : null;
+            return body !== null && body.length > MAX
+              ? { ...a, content_body: body.slice(0, MAX), body_truncated: true, body_length: body.length }
+              : { ...a, body_truncated: false, body_length: body?.length ?? 0 };
+          };
+          if (data.article) return ok({ article: { ...data.article, body_truncated: false, body_length: typeof data.article.content_body === "string" ? data.article.content_body.length : 0 } });
+          return ok({ articles: (data.articles ?? []).map(trim), pagination: data.pagination ?? null });
+        }
 
         const params = new URLSearchParams({ action: "articles" });
         params.set("limit", String(Math.min(Number(limit), 100)));

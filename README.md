@@ -78,7 +78,7 @@ Prefer zero-install? The same 17 tools are served hosted at **`https://mcp.opedd
 }
 ```
 
-Key routing: `opedd_pub_*` → publisher tools · `opedd_buyer_*` → content retrieval · `ent_*` → bulk feeds · buyer-portal JWT → audit/compliance/EU-AI-Act tools. Your key is forwarded per request and never stored by the gateway.
+Key routing: `opedd_sk_*` (legacy `opedd_pub_*`) → publisher tools · `opedd_buyer_*` → content retrieval · `ent_*` → bulk feeds · buyer-portal JWT → audit/compliance/EU-AI-Act tools. Your key is forwarded per request and never stored by the gateway.
 
 ## What it does
 
@@ -119,7 +119,7 @@ Exposes up to 17 tools to any AI assistant (some are conditional on env vars):
 | `get_compliance_dossier` | Procurement-defense compliance dossier mapping retrievals to license terms (Phase 11 M4) |
 | `article_53_attestation` | Signed JWT attesting EU AI Act Article 53(1)(d) compliance for a license — the artifact AI labs hand to legal/procurement (Phase 12 W1.4) |
 
-**Requires `OPEDD_PUB_BEARER` (opedd_pub_*) — publisher-side**
+**Requires `OPEDD_PUB_BEARER` (opedd_sk_*; legacy opedd_pub_* still works) — publisher-side**
 
 | Tool | Description |
 |------|-------------|
@@ -159,7 +159,7 @@ Set environment variables to pre-configure the server:
 | `OPEDD_BUYER_TOKEN` | Optional | Buyer API token (`opedd_buyer_live_*` canonical; `opedd_buyer_test_*` for sandbox) — enables `get_content` |
 | `OPEDD_ACCESS_KEY` | Optional | Enterprise access key (`ent_*`) — enables `list_feed` + `stream_feed_ndjson` |
 | `OPEDD_BUYER_JWT` | Optional | Supabase session JWT from the buyer portal — enables `get_buyer_account` + `get_audit_events` + `get_compliance_dossier` + `article_53_attestation` |
-| `OPEDD_PUB_BEARER` | Optional | Canonical Publisher API Bearer key (`opedd_pub_<env>_<32-hex>`; issued via `POST /publishers-api-keys action=create_api_key`) — enables `list_publisher_content` + `push_content`. **v0.4.0 canonical.** |
+| `OPEDD_PUB_BEARER` | Optional | Publisher API key (`opedd_sk_<32-hex>`, canonical since 2026-08-27; older `opedd_pub_<32-hex>` keys keep working) — from the Opedd dashboard, Settings → Developers. Enables `list_publisher_content` (+ `include_body`) and `push_content`. |
 | `OPEDD_API_KEY` | Deprecated | Legacy Publisher API key (`op_...`) — fallback during the transition window; will stop working when opedd-backend Phase C deploys. Migrate to `OPEDD_PUB_BEARER`. |
 | `OPEDD_API_URL` | Optional | Override the API base URL (default: Opedd production) |
 | `OPEDD_MCP_TELEMETRY` | Optional | Set to `0` to disable anonymous usage telemetry (see below) |
