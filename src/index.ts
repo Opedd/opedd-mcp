@@ -203,7 +203,7 @@ function auditCred(creds: Credentials): string | undefined {
 
 const HOW_ACCESS_KEY =
   "Enterprise access keys (ent_*) are delivered when an enterprise licence is issued — start at https://opedd.com/enterprise " +
-  "or purchase programmatically with the purchase_enterprise_license tool.";
+  "or place a licence order with the place_licence_order tool.";
 const HOW_PUB_BEARER =
   "Publisher keys (opedd_sk_*, legacy opedd_pub_* still valid) come from the publisher dashboard: sign up free at https://opedd.com, then Settings → API keys.";
 
@@ -253,7 +253,8 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "Returns a license key (format: OP-XXXX-XXXX) and a certificate URL. " +
       "The buyer receives a Handshake Email with their license key. " +
       "Set OPEDD_BUYER_EMAIL and OPEDD_PAYMENT_METHOD_ID env vars to avoid passing them on every call. " +
-      "License types: 'human' = republication rights, 'ai' = training dataset rights, 'ai_inference' = inference/RAG rights.",
+      "Single-article purchases are Human republication licences only (license_type 'human'). " +
+      "AI licences (AI answers, AI training, client display) are bought as licence orders: see place_licence_order.",
     inputSchema: {
       type: "object",
       required: ["license_type", "terms_accepted"],
@@ -274,9 +275,8 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
         },
         license_type: {
           type: "string",
-          enum: ["human", "ai", "ai_inference"],
-          description:
-            "human = republication/editorial rights, ai = training dataset rights, ai_inference = inference/RAG rights",
+          enum: ["human"],
+          description: "human = Human republication (editorial republication of one article)",
         },
         buyer_email: {
           type: "string",
@@ -441,63 +441,29 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   },
   // ─── Phase 10 + 11 buyer-side surfaces (M6.4) ─────────────────────────────
   {
-    name: "purchase_enterprise_license",
+    name: "place_licence_order",
     description:
-      "Purchase a bulk enterprise license covering multiple publishers (Phase 10). " +
-      "Returns a Stripe client_secret for payment completion + the enterprise_license_id. " +
-      "After payment, an ent_* access key is emailed to buyer_email. " +
-      "Scopes: 'custom' (pass-through publisher_ids), 'platform_wide' (auto-resolve all opted-in publishers), 'filtered' (Phase 10 filter_rules). " +
-      "License tiers: 'rag' (= ai_retrieval), 'training' (= ai_training, flat-fee not metered), 'inference' (= ai_retrieval), 'full_ai' (writes both retrieval + training records). " +
-      "The buyer must accept the Opedd Master Services Agreement (opedd.com/terms) before purchase — set terms_accepted=true to record it.",
+      "Place a licence order with Opedd for one or more publishers. One order = one licence and one billing mode; " +
+      "each publisher becomes its own Schedule priced from that publisher's settings (publishers that do not offer it are " +
+      "returned in `unavailable` and never charged). Licences: 'enterprise' (AI answers: 'monthly' full text per article, or " +
+      "'metered' pay-per-request snippets of up to 300 words or 25% of the article), 'training' (AI training of the back " +
+      "catalogue up to the order date: 'one_time', bulk export via stream_feed_ndjson), 'display' (client display: 'monthly', " +
+      "quantity = number of end clients). Returns the order, its lines, the access key (works once paid) and " +
+      "hosted_invoice_url — the buyer (your principal) pays there. Requires a buyer session (OPEDD_BUYER_JWT) and " +
+      "terms_accepted=true after the buyer has accepted the Opedd Master Services Agreement (opedd.com/terms).",
     inputSchema: {
       type: "object",
-      required: ["publisher_ids", "buyer_email", "buyer_org", "terms_accepted"],
+      required: ["licence", "billing_mode", "publisher_ids", "terms_accepted"],
       properties: {
+        licence: { type: "string", enum: ["enterprise", "training", "display"], description: "enterprise = AI answers, training = AI training, display = client display" },
+        billing_mode: { type: "string", enum: ["monthly", "metered", "one_time"], description: "enterprise: monthly | metered; training: one_time; display: monthly" },
+        publisher_ids: { type: "array", items: { type: "string" }, description: "Publisher UUIDs (1-500; at most 18 for metered)" },
+        quantity: { type: "number", description: "display only: number of end clients (1-500)" },
         terms_accepted: {
           type: "boolean",
           description:
-            "REQUIRED. Set true only after the buyer (your principal) has accepted the Opedd Master Services Agreement at opedd.com/terms. " +
-            "The current MSA version label is recorded with the licence; purchases without genuine acceptance are rejected (HTTP 400).",
-        },
-        publisher_ids: {
-          type: "array",
-          items: { type: "string" },
-          description: "Array of publisher UUIDs. Required for scope='custom'; ignored for platform_wide/filtered (resolved server-side).",
-        },
-        buyer_email: {
-          type: "string",
-          description: "Email to deliver the access key after payment",
-        },
-        buyer_org: {
-          type: "string",
-          description: "Buyer organization name (for billing + audit ledger)",
-        },
-        billing_type: {
-          type: "string",
-          enum: ["annual", "monthly", "annual_plus_monthly"],
-          description: "Billing cadence (default: annual)",
-        },
-        license_tier: {
-          type: "string",
-          enum: ["rag", "training", "inference", "full_ai"],
-          description: "License tier (default: rag)",
-        },
-        duration_months: {
-          type: "number",
-          description: "License duration in months (default: 12)",
-        },
-        scope: {
-          type: "string",
-          enum: ["custom", "platform_wide", "filtered"],
-          description: "Coverage scope (default: custom)",
-        },
-        filter_rules: {
-          type: "object",
-          description: "Required when scope='filtered'. See Phase 10 docs for shape: excluded_publisher_ids / direct_license_carveouts / categories / max_price_per_event.",
-        },
-        buyer_webhook_url: {
-          type: "string",
-          description: "Optional HMAC-signed webhook for content.published events on covered publishers",
+            "REQUIRED. Set true only after the buyer has accepted the Opedd Master Services Agreement at opedd.com/terms. " +
+            "The current version label is recorded with the order; orders without genuine acceptance are rejected.",
         },
       },
     },
@@ -511,7 +477,9 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
     description:
       "Retrieve the full body of a licensed article using a buyer API token (opedd_buyer_live_* canonical; opedd_buyer_test_* for sandbox). " +
       "Requires OPEDD_BUYER_TOKEN env var (create one at opedd.com/licenses after purchasing). " +
-      "Works for per-article licenses (token scoped to that article) and archive licenses (token covers all publisher content). " +
+      "Works for per-article Human republication licences (token scoped to that article) and licence orders: AI answers " +
+      "monthly and client display return full text; AI answers pay-per-request always returns a snippet (up to 300 words " +
+      "or 25% of the article, whatever delivery_mode is asked). Articles the publisher stopped licensing answer 403 ARTICLE_EXCLUDED. " +
       "The publisher must have content delivery enabled and must have pushed content for the article. " +
       "Phase 11 M2 RAG-extended shape: response includes 7 RAG-essential metadata fields — author, language, word_count, content_hash, image_urls, canonical_url, tags. " +
       "On pre-2026-05-14 historical articles, optional fields (author/language/image_urls/canonical_url/tags) may be NULL. " +
@@ -539,9 +507,10 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
     name: "list_feed",
     description:
       "List articles from a buyer's licensed catalog via GET /enterprise-license (Phase 10 + 11). " +
-      "Content contract: flat-fee scopes (custom/platform_wide) include full content_body; METERED " +
-      "(filtered-scope) keys get a discovery-only feed — content_body is null and content_access is " +
-      "'metered_per_call'; fetch article text via get_content (each retrieval is billed). " +
+      "Content contract: AI training orders include full content_body for the back catalogue up to the order date " +
+      "(content_access 'included'). Every other order is discovery-only (content_body null): AI answers monthly and " +
+      "client display fetch text per article via get_content (content_access 'retrieval_per_article'); pay-per-request " +
+      "fetches billed snippets via get_content (content_access 'metered_per_call'). " +
       "Returns JSON-format response with paginated articles. " +
       "Use `since` (ISO 8601) for delta-feed polling — only articles published after the timestamp. " +
       "Use `cursor` for pagination across pages. " +
@@ -570,8 +539,8 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
     description:
       "Bulk-export a buyer's licensed catalog via GET /enterprise-license?format=ndjson (Phase 11 M3). " +
       "Returns up to 1000 articles per call (collected from line-delimited JSON wire format). " +
-      "Same per-scope content contract as list_feed: METERED (filtered-scope) keys export metadata only " +
-      "(content_body null, content_access 'metered_per_call') — use get_content for article text. " +
+      "Same content contract as list_feed: full text for AI training orders only; every other order exports " +
+      "metadata (content_body null) — use get_content for article text. " +
       "Each article emits one usage_records row (analytics-only sentinel 'bulk-export:<request_id>:<article_id>' — not metered-billable per the revenue-model bifurcation invariant). " +
       "Use `since` (ISO 8601) for delta-feed. Use `cursor` to paginate beyond 1000. " +
       "Backend supports 5000 articles per call; the MCP cap is 1000 for transport reasonability. " +
@@ -602,6 +571,22 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
 // key (OPEDD_BUYER_TOKEN) works on 3 of these 4; get_buyer_account remains
 // JWT-only (its endpoint mints keys — a key must never mint keys).
   if (has.buyerJwt || has.buyerToken) {
+  TOOLS.push({
+    name: "list_licence_orders",
+    description:
+      "List the buyer's licence orders, newest first, each with its lines (publisher, licence, unit, price, quantity, status). " +
+      "Pass order_id to read one order: each line then carries its Schedule document text and SHA-256 — the licence " +
+      "fingerprint recorded on the Tempo blockchain when the line was issued. Read-only. Requires a buyer API key with " +
+      "the 'audit' scope (OPEDD_BUYER_TOKEN) or a buyer session (OPEDD_BUYER_JWT).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        order_id: { type: "string", description: "Read one order (UUID) including Schedule documents" },
+        cursor: { type: "string", description: "Opaque cursor from the prior response's pagination.next_cursor" },
+        limit: { type: "number", description: "Orders per page (default 20, max 100)" },
+      },
+    },
+  });
   TOOLS.push({
     name: "get_audit_events",
     description:
@@ -1074,66 +1059,58 @@ export async function dispatchTool(
         return ok(data);
       }
 
-      // ── purchase_enterprise_license (Phase 10) ─────────────────────────────
-      case "purchase_enterprise_license": {
-        const {
-          publisher_ids,
-          buyer_email: pelEmail,
-          buyer_org,
-          billing_type = "annual",
-          license_tier = "rag",
-          duration_months = 12,
-          scope = "custom",
-          filter_rules,
-          buyer_webhook_url,
-          terms_accepted,
-        } = args as {
+      // ── place_licence_order (licensing MVP, backend PR-B1) ─────────────────
+      // POST /enterprise-license requires a buyer SESSION since 2026-09-17
+      // (API keys are refused on money endpoints): the order is placed with
+      // OPEDD_BUYER_JWT and the buyer pays the hosted invoice.
+      case "place_licence_order": {
+        if (!creds.buyerJwt) {
+          return credErr("A buyer session is required to place an order", "OPEDD_BUYER_JWT", HOW_BUYER_JWT);
+        }
+        const { licence, billing_mode, publisher_ids, quantity, terms_accepted } = args as {
+          licence?: string;
+          billing_mode?: string;
           publisher_ids?: string[];
-          buyer_email?: string;
-          buyer_org?: string;
-          billing_type?: string;
-          license_tier?: string;
-          duration_months?: number;
-          scope?: string;
-          filter_rules?: Record<string, unknown>;
-          buyer_webhook_url?: string;
+          quantity?: number;
           terms_accepted?: boolean;
         };
-
-        if (!Array.isArray(publisher_ids) || publisher_ids.length === 0) {
-          if (scope === "custom") {
-            return err("publisher_ids array is required for scope='custom'");
-          }
-        }
-        if (!pelEmail) return err("buyer_email is required");
-        if (!buyer_org) return err("buyer_org is required");
+        if (!licence || !billing_mode) return err("licence and billing_mode are required");
+        if (!Array.isArray(publisher_ids) || publisher_ids.length === 0) return err("publisher_ids must be a non-empty array");
         if (terms_accepted !== true) {
           return err(
-            "terms_accepted must be true — confirm with the buyer that they accept the Opedd Master Services Agreement (opedd.com/terms) before purchasing."
+            "terms_accepted must be true — confirm with the buyer that they accept the Opedd Master Services Agreement (opedd.com/terms) before ordering."
           );
         }
-
-        const body: Record<string, unknown> = {
-          publisher_ids: publisher_ids ?? [],
-          buyer_email: pelEmail,
-          buyer_org,
-          billing_type,
-          license_tier,
-          duration_months,
-          scope,
-          // Genuine assent moment: the agent asserted terms_accepted=true just
-          // now. The backend requires the MSA version label (fail-closed since
-          // 2026-07-31) and rejects superseded labels — on an MSA version bump
-          // this constant must be updated (new package release) to match
-          // opedd-backend _shared/msa-version.ts CURRENT_MSA_VERSION.
-          terms_version: CURRENT_MSA_VERSION,
-          ...(filter_rules ? { filter_rules } : {}),
-          ...(buyer_webhook_url ? { buyer_webhook_url } : {}),
-        };
-
         const data = await opeddFetch(creds, "/enterprise-license", {
           method: "POST",
-          body: JSON.stringify(body),
+          headers: { Authorization: `Bearer ${creds.buyerJwt}` },
+          body: JSON.stringify({
+            licence,
+            billing_mode,
+            publisher_ids,
+            ...(quantity !== undefined ? { quantity } : {}),
+            // Genuine assent moment: the agent asserted terms_accepted=true just
+            // now. On an MSA version bump this constant must be updated (new
+            // package release) to match opedd-backend _shared/msa-version.ts.
+            terms_version: CURRENT_MSA_VERSION,
+          }),
+        });
+        return ok(data);
+      }
+
+      // ── list_licence_orders (GET /buyer-orders) ──────────────────────────
+      case "list_licence_orders": {
+        if (!auditCred(creds)) {
+          return credErr("Buyer credentials are required for this tool", "OPEDD_BUYER_TOKEN (audit-scoped key) or OPEDD_BUYER_JWT", HOW_AUDIT_CRED);
+        }
+        const { order_id, cursor, limit } = args as { order_id?: string; cursor?: string; limit?: number };
+        const params = new URLSearchParams();
+        if (order_id) params.set("order_id", order_id);
+        if (cursor) params.set("cursor", cursor);
+        if (limit !== undefined) params.set("limit", String(Math.min(Math.max(Number(limit) || 20, 1), 100)));
+        const qs = params.toString();
+        const data = await opeddFetch(creds, `/buyer-orders${qs ? `?${qs}` : ""}`, {
+          headers: { Authorization: `Bearer ${auditCred(creds)}` },
         });
         return ok(data);
       }

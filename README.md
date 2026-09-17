@@ -35,7 +35,7 @@ Then add it to your MCP host (see [Claude Desktop / Cursor / Windsurf setup](#cl
 
 ## Hosted endpoint — no install (mcp.opedd.com)
 
-Prefer zero-install? The same 17 tools are served hosted at **`https://mcp.opedd.com/mcp`** (Streamable HTTP). Auth is an `Authorization: Bearer` header with any Opedd key — public discovery tools need no auth at all.
+Prefer zero-install? The same 19 tools are served hosted at **`https://mcp.opedd.com/mcp`** (Streamable HTTP). Auth is an `Authorization: Bearer` header with any Opedd key — public discovery tools need no auth at all.
 
 **Claude Messages API** (production agents):
 
@@ -82,7 +82,7 @@ Key routing: `opedd_sk_*` (legacy `opedd_pub_*`) → publisher tools · `opedd_b
 
 ## What it does
 
-Exposes up to 17 tools to any AI assistant (some are conditional on env vars):
+Exposes up to 19 tools to any AI assistant (some are conditional on env vars):
 
 **Always available — discovery + per-article purchase + onboarding + rights signaling**
 
@@ -90,11 +90,11 @@ Exposes up to 17 tools to any AI assistant (some are conditional on env vars):
 |------|-------------|
 | `search_content` | Full-text search across everything licensable (v0.8.0) — ranked matches with publisher, prices, word count and a description snippet; quotes for phrases, `-word` to exclude |
 | `lookup_content` | Look up an article by URL — returns title, publisher, pricing |
-| `purchase_license` | Buy a single-article license via Stripe — returns OP-XXXX-XXXX key. Requires `terms_accepted: true` (genuine buyer assent to opedd.com/terms; recorded with the licence) |
+| `purchase_license` | Buy a Human republication licence for one article via Stripe — returns OP-XXXX-XXXX key. Requires `terms_accepted: true` (genuine buyer assent to opedd.com/terms; recorded with the licence) |
 | `verify_license` | Verify a license key — returns validity, article, publisher, blockchain proof |
 | `browse_registry` | Browse the public Opedd registry — lists issued LICENSES (use `publisher_directory` to browse publishers themselves) |
 | `publisher_directory` | Browse the public Opedd publisher catalog — paginated publishers with article counts + pricing + sample articles (primary buyer-discovery surface for AI labs) |
-| `purchase_enterprise_license` | Buy a bulk enterprise license covering multiple publishers (Phase 10) — returns Stripe `client_secret`. Requires `terms_accepted: true`; the current Master Services Agreement version label is recorded with the licence (the backend rejects superseded labels) |
+| `place_licence_order` | Place a licence order for one or more publishers: AI answers (`monthly` full text, or `metered` pay-per-request snippets ≤300 words / 25%), AI training (`one_time`, back catalogue), client display (`monthly` × end clients). Each publisher is its own Schedule at its own price; returns the order, lines, `unavailable` publishers and `hosted_invoice_url`. Needs `OPEDD_BUYER_JWT` and `terms_accepted: true` |
 | `rsl_get` | Fetch a publisher's RSL Standard manifest — public discovery surface; `jsonld: true` returns CDSM Article 4(3) signed receipt (Phase 12 W1.1) |
 | `detect_platform` | Detect the content platform behind a URL — returns suggested onboarding workflow for Substack / Beehiiv / Ghost / Medium / Brevo / custom (Phase 12 W3.1) |
 
@@ -102,20 +102,21 @@ Exposes up to 17 tools to any AI assistant (some are conditional on env vars):
 
 | Tool | Description |
 |------|-------------|
-| `get_content` | Retrieve a licensed article — includes 7 Phase 11 M2 RAG metadata fields (author, language, word_count, content_hash, image_urls, canonical_url, tags) |
+| `get_content` | Retrieve a licensed article — full text for AI answers monthly and client display orders, a snippet (≤300 words / 25%) for pay-per-request; includes 7 RAG metadata fields (author, language, word_count, content_hash, image_urls, canonical_url, tags) |
 
 **Requires `OPEDD_ACCESS_KEY` (ent_*) — buyer-side feed surfaces**
 
 | Tool | Description |
 |------|-------------|
-| `list_feed` | List articles from a buyer's licensed catalog with `since` delta-feed support (Phase 11 M5). Flat-fee scopes carry full `content_body`; metered (filtered-scope) keys get a discovery-only feed (`content_body: null`, `content_access: "metered_per_call"`) — fetch text via `get_content` (billed per call) |
-| `stream_feed_ndjson` | Bulk-export up to 1000 articles per call via NDJSON wire format (Phase 11 M3). Same per-scope content contract as `list_feed` — metered keys export metadata only |
+| `list_feed` | List articles from a buyer's licensed catalog with `since` delta-feed support. AI training orders carry full `content_body` (back catalogue up to the order date, `content_access: "included"`); every other order is discovery-only (`content_body: null`, `content_access: "retrieval_per_article"` or `"metered_per_call"`) — fetch text via `get_content` |
+| `stream_feed_ndjson` | Bulk-export up to 1000 articles per call via NDJSON wire format. Same content contract as `list_feed` — full text for AI training orders only |
 
 **Requires `OPEDD_BUYER_JWT` (Supabase JWT) — buyer account + audit + compliance + EU AI Act surfaces**
 
 | Tool | Description |
 |------|-------------|
 | `get_buyer_account` | Fetch buyer profile + masked API key list — buyer-dashboard mental model |
+| `list_licence_orders` | The buyer's licence orders and lines; with `order_id`, each line's Schedule document and its SHA-256 (the fingerprint recorded on Tempo). Also works with an audit-scoped `OPEDD_BUYER_TOKEN` |
 | `get_audit_events` | Per-event audit ledger with Tempo on-chain attestation inclusion proofs inline (Phase 9.x + 10 M5) |
 | `get_compliance_dossier` | Procurement-defense compliance dossier mapping retrievals to license terms (Phase 11 M4) |
 | `article_53_attestation` | Signed JWT attesting EU AI Act Article 53(1)(d) compliance for a license — the artifact AI labs hand to legal/procurement (Phase 12 W1.4) |
@@ -159,7 +160,7 @@ Set environment variables to pre-configure the server:
 | `OPEDD_PAYMENT_METHOD_ID` | Recommended | Stripe `pm_...` ID — used for autonomous per-article purchasing |
 | `OPEDD_BUYER_TOKEN` | Optional | Buyer API token (`opedd_buyer_live_*` canonical; `opedd_buyer_test_*` for sandbox) — enables `get_content` |
 | `OPEDD_ACCESS_KEY` | Optional | Enterprise access key (`ent_*`) — enables `list_feed` + `stream_feed_ndjson` |
-| `OPEDD_BUYER_JWT` | Optional | Supabase session JWT from the buyer portal — enables `get_buyer_account` + `get_audit_events` + `get_compliance_dossier` + `article_53_attestation` |
+| `OPEDD_BUYER_JWT` | Optional | Supabase session JWT from the buyer portal — enables `place_licence_order` + `list_licence_orders` + `get_buyer_account` + `get_audit_events` + `get_compliance_dossier` + `article_53_attestation` |
 | `OPEDD_PUB_BEARER` | Optional | Publisher API key (`opedd_sk_<32-hex>`, canonical since 2026-08-27; older `opedd_pub_<32-hex>` keys keep working) — from the Opedd dashboard, Settings → Developers. Enables `list_publisher_content` (+ `include_body`) and `push_content`. |
 | `OPEDD_API_KEY` | Deprecated | Legacy Publisher API key (`op_...`) — fallback during the transition window; will stop working when opedd-backend Phase C deploys. Migrate to `OPEDD_PUB_BEARER`. |
 | `OPEDD_API_URL` | Optional | Override the API base URL (default: Opedd production) |
