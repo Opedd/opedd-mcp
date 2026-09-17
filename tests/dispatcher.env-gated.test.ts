@@ -68,7 +68,7 @@ function mockFetchNdjson(lines: unknown[]): ReturnType<typeof vi.fn> {
 // ───────────────────────────── all env-gated tools register ─────────────────────────────
 
 describe("TOOLS array with all env vars set", () => {
-  it("exposes the 8 env-gated tools alongside the always-available", async () => {
+  it("exposes the 9 env-gated tools alongside the always-available", async () => {
     const { TOOLS } = await loadDispatcher();
     const names = TOOLS.map((t) => t.name);
     // BUYER_TOKEN-gated
@@ -78,13 +78,14 @@ describe("TOOLS array with all env vars set", () => {
     expect(names).toContain("article_53_attestation");
     expect(names).toContain("get_audit_events");
     expect(names).toContain("get_compliance_dossier");
+    expect(names).toContain("list_licence_orders");
     // ACCESS_KEY-gated
     expect(names).toContain("list_feed");
     expect(names).toContain("stream_feed_ndjson");
     // API_KEY-gated (publisher-side: list + push)
     expect(names).toContain("list_publisher_content");
     expect(names).toContain("push_content");
-    expect(names.length).toBe(18);
+    expect(names.length).toBe(19);
   });
 });
 

@@ -74,14 +74,15 @@ describe("TOOLS array (metadata)", () => {
     const { TOOLS } = await loadDispatcher();
     const names = TOOLS.map((t) => t.name);
     // Always-available: lookup_content, purchase_license, verify_license,
-    // browse_registry, publisher_directory, purchase_enterprise_license,
+    // browse_registry, publisher_directory, place_licence_order,
     // rsl_get, detect_platform
     expect(names).toContain("lookup_content");
     expect(names).toContain("purchase_license");
     expect(names).toContain("verify_license");
     expect(names).toContain("browse_registry");
     expect(names).toContain("publisher_directory");
-    expect(names).toContain("purchase_enterprise_license");
+    expect(names).toContain("place_licence_order");
+    expect(names).not.toContain("purchase_enterprise_license");
     expect(names).toContain("rsl_get");
     expect(names).toContain("detect_platform");
     expect(names.length).toBeGreaterThanOrEqual(8);
@@ -323,7 +324,7 @@ describe("dispatchTool: purchase_license", () => {
     const { dispatchTool } = await loadDispatcher();
     await dispatchTool("purchase_license", {
       article_id: "art-1",
-      license_type: "ai",
+      license_type: "human",
       terms_accepted: true,
     });
     const calls = (f as ReturnType<typeof vi.fn>).mock.calls;
@@ -333,7 +334,7 @@ describe("dispatchTool: purchase_license", () => {
     // Env fallback supplies buyer_email + payment.payment_method_id
     expect(body.buyer_email).toBe(TEST_BUYER_EMAIL);
     expect(body.payment.payment_method_id).toBe(TEST_PM_ID);
-    expect(body.license_type).toBe("ai");
+    expect(body.license_type).toBe("human");
     // Fail-closed assent (2026-07-24): the tool stamps the acceptance moment.
     expect(typeof body.terms_accepted_at).toBe("string");
     expect(Number.isNaN(Date.parse(body.terms_accepted_at))).toBe(false);
@@ -344,7 +345,7 @@ describe("dispatchTool: purchase_license", () => {
     const { dispatchTool } = await loadDispatcher();
     const result = await dispatchTool("purchase_license", {
       article_id: "art-1",
-      license_type: "ai",
+      license_type: "human",
     });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("terms_accepted");
@@ -353,7 +354,7 @@ describe("dispatchTool: purchase_license", () => {
   it("rejects missing article_url AND article_id", async () => {
     mockFetchOk({});
     const { dispatchTool } = await loadDispatcher();
-    const result = await dispatchTool("purchase_license", { license_type: "ai" });
+    const result = await dispatchTool("purchase_license", { license_type: "human" });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("article_url or article_id");
   });
@@ -364,7 +365,7 @@ describe("dispatchTool: purchase_license", () => {
     const { dispatchTool } = await loadDispatcher();
     const result = await dispatchTool("purchase_license", {
       article_id: "art-1",
-      license_type: "ai",
+      license_type: "human",
       terms_accepted: true,
     });
     expect(result.isError).toBe(true);
@@ -372,56 +373,66 @@ describe("dispatchTool: purchase_license", () => {
   });
 });
 
-// ───────────────────────────── purchase_enterprise_license ─────────────────────────────
+// ───────────────────────────── place_licence_order ─────────────────────────────
 
-describe("dispatchTool: purchase_enterprise_license", () => {
-  it("happy path — defaults billing_type=annual, license_tier=rag, scope=custom", async () => {
-    const f = mockFetchOk({
-      success: true,
-      data: { enterprise_license_id: "lic-1", stripe_client_secret: "cs_..." },
-    });
+describe("dispatchTool: place_licence_order", () => {
+  it("purchase_license offers Human republication only (AI licences are licence orders)", async () => {
+    const { TOOLS } = await loadDispatcher();
+    const tool = TOOLS.find((t) => t.name === "purchase_license")!;
+    const props = (tool.inputSchema as { properties: Record<string, { enum?: string[] }> }).properties;
+    expect(props.license_type.enum).toEqual(["human"]);
+  });
+
+  it("happy path — POSTs the order body with the buyer session and the current MSA label", async () => {
+    vi.stubEnv("OPEDD_BUYER_JWT", "jwt.buyer.session");
+    const f = mockFetchOk({ success: true, data: { order_id: "ord-1", hosted_invoice_url: "https://invoice.stripe.com/i/x" } });
     const { dispatchTool } = await loadDispatcher();
-    await dispatchTool("purchase_enterprise_license", {
-      publisher_ids: ["pub-1"],
-      buyer_email: "eng@yourlab.com",
-      buyer_org: "AI Lab",
+    const result = await dispatchTool("place_licence_order", {
+      licence: "display",
+      billing_mode: "monthly",
+      publisher_ids: ["pub-1", "pub-2"],
+      quantity: 3,
       terms_accepted: true,
     });
+    expect(result.isError).toBeFalsy();
     const calls = (f as ReturnType<typeof vi.fn>).mock.calls;
-    expect(calls[0][0]).toContain("/enterprise-license");
-    const body = JSON.parse((calls[0][1] as RequestInit).body as string);
-    expect(body.billing_type).toBe("annual");
-    expect(body.license_tier).toBe("rag");
-    expect(body.scope).toBe("custom");
-    // Fail-closed MSA assent (2026-07-31): the current version label rides
-    // every create so the backend can record provable acceptance.
+    expect(calls[0][0]).toBe("https://api.opedd.com/enterprise-license");
+    const init = calls[0][1] as RequestInit;
+    expect(init.method).toBe("POST");
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer jwt.buyer.session");
+    const body = JSON.parse(init.body as string);
+    expect(body).toMatchObject({ licence: "display", billing_mode: "monthly", publisher_ids: ["pub-1", "pub-2"], quantity: 3 });
     expect(body.terms_version).toMatch(/^master-services-agreement-/);
+    expect(body).not.toHaveProperty("buyer_email");
   });
 
-  it("requires publisher_ids for scope='custom'", async () => {
-    mockFetchOk({});
-    const { dispatchTool } = await loadDispatcher();
-    const result = await dispatchTool("purchase_enterprise_license", {
-      buyer_email: "x",
-      buyer_org: "y",
-      scope: "custom",
-      terms_accepted: true,
-    });
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain("publisher_ids");
-  });
-
-  it("rejects when terms_accepted is not true (fail-closed MSA assent)", async () => {
+  it("refuses without a buyer session, without terms_accepted, or without publishers — and calls nothing", async () => {
     const f = mockFetchOk({});
-    const { dispatchTool } = await loadDispatcher();
-    const result = await dispatchTool("purchase_enterprise_license", {
-      publisher_ids: ["pub-1"],
-      buyer_email: "eng@yourlab.com",
-      buyer_org: "AI Lab",
-    });
+    let { dispatchTool } = await loadDispatcher();
+    let result = await dispatchTool("place_licence_order", { licence: "enterprise", billing_mode: "monthly", publisher_ids: ["p"], terms_accepted: true });
     expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("OPEDD_BUYER_JWT");
+
+    vi.stubEnv("OPEDD_BUYER_JWT", "jwt.buyer.session");
+    ({ dispatchTool } = await loadDispatcher());
+    result = await dispatchTool("place_licence_order", { licence: "enterprise", billing_mode: "monthly", publisher_ids: ["p"] });
     expect(result.content[0].text).toContain("terms_accepted");
+    result = await dispatchTool("place_licence_order", { licence: "enterprise", billing_mode: "monthly", publisher_ids: [], terms_accepted: true });
+    expect(result.content[0].text).toContain("publisher_ids");
     expect((f as ReturnType<typeof vi.fn>).mock.calls.length).toBe(0);
+  });
+});
+
+describe("dispatchTool: list_licence_orders", () => {
+  it("lists with the audit-scoped key; reads one order by id", async () => {
+    const f = mockFetchOk({ success: true, data: { orders: [] } });
+    const { dispatchTool } = await loadDispatcher();
+    await dispatchTool("list_licence_orders", { limit: 500 });
+    await dispatchTool("list_licence_orders", { order_id: "ord-1" });
+    const calls = (f as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls[0][0]).toBe("https://api.opedd.com/buyer-orders?limit=100");
+    expect(((calls[0][1] as RequestInit).headers as Record<string, string>).Authorization).toBe(`Bearer ${TEST_BUYER_TOKEN}`);
+    expect(calls[1][0]).toBe("https://api.opedd.com/buyer-orders?order_id=ord-1");
   });
 });
 
