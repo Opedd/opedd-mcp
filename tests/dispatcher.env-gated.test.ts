@@ -68,11 +68,15 @@ function mockFetchNdjson(lines: unknown[]): ReturnType<typeof vi.fn> {
 // ───────────────────────────── all env-gated tools register ─────────────────────────────
 
 describe("TOOLS array with all env vars set", () => {
-  it("exposes the 9 env-gated tools alongside the always-available", async () => {
+  it("exposes the 10 env-gated tools alongside the always-available", async () => {
     const { TOOLS } = await loadDispatcher();
     const names = TOOLS.map((t) => t.name);
     // BUYER_TOKEN-gated
     expect(names).toContain("get_content");
+    // The PAID question tool (OP-B5). Distinct from the free search_content,
+    // which returns no article text: this one returns licensed passages and
+    // charges per publisher per question.
+    expect(names).toContain("search_passages");
     // BUYER_JWT-gated
     expect(names).toContain("get_buyer_account");
     expect(names).toContain("article_53_attestation");
@@ -85,7 +89,7 @@ describe("TOOLS array with all env vars set", () => {
     // API_KEY-gated (publisher-side: list + push)
     expect(names).toContain("list_publisher_content");
     expect(names).toContain("push_content");
-    expect(names.length).toBe(19);
+    expect(names.length).toBe(20);
   });
 });
 

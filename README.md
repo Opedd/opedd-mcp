@@ -88,7 +88,8 @@ Exposes up to 19 tools to any AI assistant (some are conditional on env vars):
 
 | Tool | Description |
 |------|-------------|
-| `search_content` | Full-text search across everything licensable (v0.8.0) — ranked matches with publisher, prices, word count and a description snippet; quotes for phrases, `-word` to exclude |
+| `search_content` | **Free discovery.** Full-text search across everything licensable (v0.8.0) — ranked matches with publisher, prices, word count and a description snippet; quotes for phrases, `-word` to exclude. Returns **no article text** — use `search_passages` to actually read |
+| `search_passages` | **Paid.** Ask a question, get licensed passages that answer it, with citations. Searches only publishers you hold a per-question licence for; charges once per publisher per question at that publisher's own price. Capped at 300 words or 25% of the article, counted cumulatively. Needs a buyer key with the `search` scope. Re-asking within 24h is free |
 | `lookup_content` | Look up an article by URL — returns title, publisher, pricing |
 | `purchase_license` | Buy a Human republication licence for one article via Stripe — returns OP-XXXX-XXXX key. Requires `terms_accepted: true` (genuine buyer assent to opedd.com/terms; recorded with the licence) |
 | `verify_license` | Verify a license key — returns validity, article, publisher, blockchain proof |

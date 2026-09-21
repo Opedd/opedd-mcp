@@ -464,3 +464,85 @@ describe("dispatchTool: shared error paths", () => {
     expect(result.content[0].text).toContain("Internal");
   });
 });
+
+// ─────────────────────────── search_passages (OP-B5) ───────────────────────
+//
+// The PAID question tool. Distinct from search_content, which is free and
+// returns no article text. These tests pin the two things a wrong call would
+// cost real money or leak: that it POSTs to /search with the buyer's key, and
+// that it refuses locally rather than spending a round trip on junk.
+
+describe("dispatchTool: search_passages", () => {
+  it("happy path — POSTs the question to /search with the buyer key", async () => {
+    const f = mockFetchOk({
+      success: true,
+      data: {
+        request_id: "req_abc",
+        passages: [{ text: "<opedd:passage>\nwords\n</opedd:passage>", words: 287 }],
+        billing: { charged_cents: 15, publishers_charged: 1 },
+      },
+    });
+    const { dispatchTool } = await loadDispatcher();
+    const result = await dispatchTool("search_passages", { query: "what is embedded finance" });
+
+    expect(f).toHaveBeenCalledOnce();
+    const [url, init] = (f as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(String(url)).toBe("https://api.opedd.com/search");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({ query: "what is embedded finance" });
+    expect(init.headers.Authorization).toBe(`Bearer ${TEST_BUYER_TOKEN}`);
+
+    // The dispatcher unwraps the envelope, so the payload IS the data.
+    const payload = parsePayload(result);
+    expect(payload.request_id).toBe("req_abc");
+    expect((payload.billing as Record<string, unknown>).charged_cents).toBe(15);
+  });
+
+  it("normalises whitespace so the same question bills once", async () => {
+    // The backend derives the request id from the NORMALISED question; sending
+    // ragged whitespace would mint a fresh id and a fresh charge for what is
+    // the same question.
+    const f = mockFetchOk({ success: true, data: { passages: [] } });
+    const { dispatchTool } = await loadDispatcher();
+    await dispatchTool("search_passages", { query: "  what   is embedded  finance " });
+    const [, init] = (f as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(JSON.parse(String(init.body)).query).toBe("what is embedded finance");
+  });
+
+  it("refuses an empty or too-short question without calling the API", async () => {
+    const f = mockFetchOk({});
+    const { dispatchTool } = await loadDispatcher();
+    for (const query of ["", "   ", "ab"]) {
+      const result = await dispatchTool("search_passages", { query });
+      expect(result.isError).toBe(true);
+    }
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("refuses an over-long question without calling the API", async () => {
+    const f = mockFetchOk({});
+    const { dispatchTool } = await loadDispatcher();
+    const result = await dispatchTool("search_passages", { query: "x".repeat(1001) });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("at most 1000");
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("prefers an explicitly passed key over the env var", async () => {
+    const f = mockFetchOk({ success: true, data: { passages: [] } });
+    const { dispatchTool } = await loadDispatcher();
+    await dispatchTool("search_passages", { query: "a question", buyer_token: "opedd_buyer_live_explicit" });
+    const [, init] = (f as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(init.headers.Authorization).toBe("Bearer opedd_buyer_live_explicit");
+  });
+
+  it("surfaces the backend's 403 rather than swallowing it", async () => {
+    // A key without the 'search' scope, which is the most likely first failure
+    // for a buyer who already had an audit key.
+    mockFetchErr({ success: false, error: "This API key does not carry the 'search' scope required here." }, 403);
+    const { dispatchTool } = await loadDispatcher();
+    const result = await dispatchTool("search_passages", { query: "a question" });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("search");
+  });
+});
