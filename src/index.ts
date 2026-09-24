@@ -13,11 +13,21 @@ import { SERVER_VERSION } from "./version.js";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
-// Current Opedd Master Services Agreement version label. MUST match
-// opedd-backend supabase/functions/_shared/msa-version.ts CURRENT_MSA_VERSION
-// (the backend rejects superseded labels). On an MSA version bump, update this
-// constant and cut a new package release.
-export const CURRENT_MSA_VERSION = "master-services-agreement-2026-07-22b";
+// The Buyer Master Agreement label is read from the API when an order is
+// placed (GET /api?action=trust_facts -> agreements.enterprise_msa_current),
+// never pinned here: a pinned label went stale when the agreement was
+// republished, and the API refuses any label that is not the current one
+// (409 NOT_CURRENT_VERSION), so every place_licence_order from 0.10.0 failed.
+async function currentTermsVersion(creds: Credentials): Promise<string> {
+  const facts = (await opeddFetch(creds, "/api?action=trust_facts")) as {
+    data?: { agreements?: { enterprise_msa_current?: unknown } };
+  };
+  const label = facts?.data?.agreements?.enterprise_msa_current;
+  if (typeof label !== "string" || !label) {
+    throw new Error("Could not read the current Buyer Master Agreement from the API");
+  }
+  return label;
+}
 
 // ─── Credentials context (2026-07-11 hosted-gateway refactor) ────────────────
 // Credentials travel EXPLICITLY through dispatchTool/opeddFetch instead of
@@ -1133,9 +1143,10 @@ export async function dispatchTool(
         if (!Array.isArray(publisher_ids) || publisher_ids.length === 0) return err("publisher_ids must be a non-empty array");
         if (terms_accepted !== true) {
           return err(
-            "terms_accepted must be true — confirm with the buyer that they accept the Opedd Master Services Agreement (opedd.com/terms) before ordering."
+            "terms_accepted must be true — confirm with the buyer that they accept the Opedd Buyer Master Agreement and the Standard Licence Terms (opedd.com/licence-terms) before ordering."
           );
         }
+        const termsVersion = await currentTermsVersion(creds);
         const data = await opeddFetch(creds, "/enterprise-license", {
           method: "POST",
           headers: { Authorization: `Bearer ${creds.buyerJwt}` },
@@ -1145,9 +1156,8 @@ export async function dispatchTool(
             publisher_ids,
             ...(quantity !== undefined ? { quantity } : {}),
             // Genuine assent moment: the agent asserted terms_accepted=true just
-            // now. On an MSA version bump this constant must be updated (new
-            // package release) to match opedd-backend _shared/msa-version.ts.
-            terms_version: CURRENT_MSA_VERSION,
+            // now, for the agreement currently in force.
+            terms_version: termsVersion,
           }),
         });
         return ok(data);

@@ -385,7 +385,16 @@ describe("dispatchTool: place_licence_order", () => {
 
   it("happy path — POSTs the order body with the buyer session and the current MSA label", async () => {
     vi.stubEnv("OPEDD_BUYER_JWT", "jwt.buyer.session");
-    const f = mockFetchOk({ success: true, data: { order_id: "ord-1", hosted_invoice_url: "https://invoice.stripe.com/i/x" } });
+    const f = vi.fn(async (url: string) =>
+      new Response(
+        JSON.stringify(
+          String(url).includes("action=trust_facts")
+            ? { success: true, data: { agreements: { enterprise_msa_current: "buyer-master-agreement-v5.4" } } }
+            : { success: true, data: { order_id: "ord-1", hosted_invoice_url: "https://invoice.stripe.com/i/x" } },
+        ),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ));
+    globalThis.fetch = f as unknown as typeof fetch;
     const { dispatchTool } = await loadDispatcher();
     const result = await dispatchTool("place_licence_order", {
       licence: "display",
@@ -396,13 +405,15 @@ describe("dispatchTool: place_licence_order", () => {
     });
     expect(result.isError).toBeFalsy();
     const calls = (f as ReturnType<typeof vi.fn>).mock.calls;
-    expect(calls[0][0]).toBe("https://api.opedd.com/enterprise-license");
-    const init = calls[0][1] as RequestInit;
+    // The current agreement is read first, then the order is placed with it.
+    expect(calls[0][0]).toBe("https://api.opedd.com/api?action=trust_facts");
+    expect(calls[1][0]).toBe("https://api.opedd.com/enterprise-license");
+    const init = calls[1][1] as RequestInit;
     expect(init.method).toBe("POST");
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer jwt.buyer.session");
     const body = JSON.parse(init.body as string);
     expect(body).toMatchObject({ licence: "display", billing_mode: "monthly", publisher_ids: ["pub-1", "pub-2"], quantity: 3 });
-    expect(body.terms_version).toMatch(/^master-services-agreement-/);
+    expect(body.terms_version).toBe("buyer-master-agreement-v5.4");
     expect(body).not.toHaveProperty("buyer_email");
   });
 
