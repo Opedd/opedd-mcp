@@ -456,19 +456,29 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "Place a licence order with Opedd for one or more publishers. One order = one licence and one billing mode; " +
       "each publisher becomes its own Schedule priced from that publisher's settings (publishers that do not offer it are " +
       "returned in `unavailable` and never charged). Licences: 'enterprise' (AI answers: 'monthly' full text per article, or " +
-      "'metered' pay-per-request snippets of up to 300 words or 25% of the article), 'training' (AI training of the back " +
-      "catalogue up to the order date: 'one_time', bulk export via stream_feed_ndjson), 'display' (client display: 'monthly', " +
-      "quantity = number of end clients). Returns the order, its lines, the access key (works once paid) and " +
+      "'metered' pay-per-request snippets of up to 300 words or 25% of the article), 'archive' (Full catalogue: everything " +
+      "the publisher published up to the order date, kept permanently, not for AI training: 'one_time', full text in the feed), " +
+      "'training' (AI training of the back catalogue up to the order date: 'one_time', bulk export via stream_feed_ndjson), " +
+      "'display' (client display: 'monthly', quantity = number of end clients). A monthly AI answers subscription only covers " +
+      "articles published from the day it starts; set include_archive=true on a 'enterprise' + 'monthly' order to add each " +
+      "publisher's Full catalogue in the same order (complete access). Returns the order, its lines, the access key (works once paid) and " +
       "hosted_invoice_url — the buyer (your principal) pays there. Requires a buyer session (OPEDD_BUYER_JWT) and " +
       "terms_accepted=true after the buyer has accepted the Opedd Master Services Agreement (opedd.com/terms).",
     inputSchema: {
       type: "object",
       required: ["licence", "billing_mode", "publisher_ids", "terms_accepted"],
       properties: {
-        licence: { type: "string", enum: ["enterprise", "training", "display"], description: "enterprise = AI answers, training = AI training, display = client display" },
-        billing_mode: { type: "string", enum: ["monthly", "metered", "one_time"], description: "enterprise: monthly | metered; training: one_time; display: monthly" },
+        licence: { type: "string", enum: ["enterprise", "archive", "training", "display"], description: "enterprise = AI answers, archive = Full catalogue (everything published up to the order date, kept permanently, no AI training), training = AI training, display = client display" },
+        billing_mode: { type: "string", enum: ["monthly", "metered", "one_time"], description: "enterprise: monthly | metered; archive: one_time; training: one_time; display: monthly" },
         publisher_ids: { type: "array", items: { type: "string" }, description: "Publisher UUIDs (1-500; at most 18 for metered)" },
         quantity: { type: "number", description: "display only: number of end clients (1-500)" },
+        include_archive: {
+          type: "boolean",
+          description:
+            "Optional, monthly AI answers only (licence 'enterprise' + billing_mode 'monthly'). true adds each publisher's " +
+            "Full catalogue to the same order: everything published before the order date, kept permanently, not for AI training. " +
+            "Publishers that do not sell their Full catalogue are returned in `unavailable`.",
+        },
         terms_accepted: {
           type: "boolean",
           description:
@@ -1132,14 +1142,24 @@ export async function dispatchTool(
         if (!creds.buyerJwt) {
           return credErr("A buyer session is required to place an order", "OPEDD_BUYER_JWT", HOW_BUYER_JWT);
         }
-        const { licence, billing_mode, publisher_ids, quantity, terms_accepted } = args as {
+        const { licence, billing_mode, publisher_ids, quantity, include_archive, terms_accepted } = args as {
           licence?: string;
           billing_mode?: string;
           publisher_ids?: string[];
           quantity?: number;
+          include_archive?: boolean;
           terms_accepted?: boolean;
         };
         if (!licence || !billing_mode) return err("licence and billing_mode are required");
+        if (include_archive !== undefined && typeof include_archive !== "boolean") {
+          return err("include_archive must be true or false");
+        }
+        // Same rule and wording as the API (opedd-backend
+        // _shared/licence-order-lines.ts parseOrderRequest): the Full catalogue
+        // is what a monthly AI answers subscription leaves out.
+        if (include_archive === true && !(licence === "enterprise" && billing_mode === "monthly")) {
+          return err("include_archive applies only to a monthly AI answers licence");
+        }
         if (!Array.isArray(publisher_ids) || publisher_ids.length === 0) return err("publisher_ids must be a non-empty array");
         if (terms_accepted !== true) {
           return err(
@@ -1155,6 +1175,7 @@ export async function dispatchTool(
             billing_mode,
             publisher_ids,
             ...(quantity !== undefined ? { quantity } : {}),
+            ...(include_archive === true ? { include_archive: true } : {}),
             // Genuine assent moment: the agent asserted terms_accepted=true just
             // now, for the agreement currently in force.
             terms_version: termsVersion,
