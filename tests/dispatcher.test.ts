@@ -434,6 +434,79 @@ describe("dispatchTool: place_licence_order", () => {
   });
 });
 
+describe("dispatchTool: place_licence_order — Full catalogue", () => {
+  function mockOrderFetch() {
+    const f = vi.fn(async (url: string) =>
+      new Response(
+        JSON.stringify(
+          String(url).includes("action=trust_facts")
+            ? { success: true, data: { agreements: { enterprise_msa_current: "buyer-master-agreement-v5.4" } } }
+            : { success: true, data: { order_id: "ord-2", lines: [], unavailable: [] } },
+        ),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ));
+    globalThis.fetch = f as unknown as typeof fetch;
+    return f;
+  }
+  const orderBody = (f: ReturnType<typeof vi.fn>) => JSON.parse((f.mock.calls[1][1] as RequestInit).body as string);
+
+  it("schema offers licence 'archive' and an optional include_archive boolean", async () => {
+    const { TOOLS } = await loadDispatcher();
+    const tool = TOOLS.find((t) => t.name === "place_licence_order")!;
+    const schema = tool.inputSchema as { required: string[]; properties: Record<string, { enum?: string[]; type?: string }> };
+    expect(schema.properties.licence.enum).toEqual(["enterprise", "archive", "training", "display"]);
+    expect(schema.properties.include_archive.type).toBe("boolean");
+    expect(schema.required).not.toContain("include_archive");
+    expect(tool.description).toContain("Full catalogue");
+  });
+
+  it("orders the Full catalogue one-off", async () => {
+    vi.stubEnv("OPEDD_BUYER_JWT", "jwt.buyer.session");
+    const f = mockOrderFetch();
+    const { dispatchTool } = await loadDispatcher();
+    const result = await dispatchTool("place_licence_order", {
+      licence: "archive", billing_mode: "one_time", publisher_ids: ["pub-1"], terms_accepted: true,
+    });
+    expect(result.isError).toBeFalsy();
+    const body = orderBody(f);
+    expect(body).toEqual({ licence: "archive", billing_mode: "one_time", publisher_ids: ["pub-1"], terms_version: "buyer-master-agreement-v5.4" });
+  });
+
+  it("sends include_archive with a monthly AI answers order, and omits it when not set", async () => {
+    vi.stubEnv("OPEDD_BUYER_JWT", "jwt.buyer.session");
+    let f = mockOrderFetch();
+    let { dispatchTool } = await loadDispatcher();
+    await dispatchTool("place_licence_order", {
+      licence: "enterprise", billing_mode: "monthly", publisher_ids: ["pub-1"], include_archive: true, terms_accepted: true,
+    });
+    expect(orderBody(f).include_archive).toBe(true);
+
+    f = mockOrderFetch();
+    ({ dispatchTool } = await loadDispatcher());
+    await dispatchTool("place_licence_order", {
+      licence: "enterprise", billing_mode: "monthly", publisher_ids: ["pub-1"], include_archive: false, terms_accepted: true,
+    });
+    expect(orderBody(f)).not.toHaveProperty("include_archive");
+  });
+
+  it.each([
+    ["enterprise", "metered"],
+    ["archive", "one_time"],
+    ["training", "one_time"],
+    ["display", "monthly"],
+  ])("refuses include_archive with %s + %s and calls nothing", async (licence, billing_mode) => {
+    vi.stubEnv("OPEDD_BUYER_JWT", "jwt.buyer.session");
+    const f = mockFetchOk({});
+    const { dispatchTool } = await loadDispatcher();
+    const result = await dispatchTool("place_licence_order", {
+      licence, billing_mode, publisher_ids: ["pub-1"], include_archive: true, terms_accepted: true,
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("include_archive applies only to a monthly AI answers licence");
+    expect((f as ReturnType<typeof vi.fn>).mock.calls.length).toBe(0);
+  });
+});
+
 describe("dispatchTool: list_licence_orders", () => {
   it("lists with the audit-scoped key; reads one order by id", async () => {
     const f = mockFetchOk({ success: true, data: { orders: [] } });
