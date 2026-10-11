@@ -6,13 +6,13 @@
     "url": "https://github.com/Opedd/opedd-mcp",
     "source": "github"
   },
-  "version": "0.6.15",
+  "version": "0.11.0",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "opedd-mcp",
-      "version": "0.6.15",
+      "version": "0.11.0",
       "transport": {
         "type": "stdio"
       },
@@ -49,7 +49,7 @@
         },
         {
           "name": "OPEDD_PUB_BEARER",
-          "description": "Publisher API key (opedd_pub_*) \u2014 enables publisher content push + listing tools",
+          "description": "Publisher API key (opedd_sk_*) \u2014 enables publisher content push + listing tools",
           "isRequired": false,
           "isSecret": true
         }
@@ -74,7 +74,7 @@
       "headers": [
         {
           "name": "Authorization",
-          "description": "Optional: Bearer <your Opedd key> (opedd_pub_* publisher, opedd_buyer_* buyer, or ent_* enterprise). Public discovery tools work without auth.",
+          "description": "Optional: Bearer <your Opedd key> (opedd_sk_* publisher, opedd_buyer_* buyer, or ent_* enterprise). Public discovery tools work without auth.",
           "isRequired": false,
           "isSecret": true
         }

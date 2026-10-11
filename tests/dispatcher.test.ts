@@ -206,6 +206,15 @@ describe("dispatchTool: browse_registry", () => {
     expect(call).toContain("limit=50");
   });
 
+  it("a junk, zero or fractional limit is clamped to a whole number in [1, 50] (the registry 400s junk)", async () => {
+    for (const [given, sent] of [["abc", "10"], [0, "1"], [-5, "1"], [7.9, "7"]] as const) {
+      const f = mockFetchOk({ success: true, data: {} });
+      const { dispatchTool } = await loadDispatcher();
+      await dispatchTool("browse_registry", { limit: given as unknown as number });
+      expect(String((f as ReturnType<typeof vi.fn>).mock.calls[0][0])).toContain(`limit=${sent}`);
+    }
+  });
+
   it("publisher_id filter flows through to query", async () => {
     const f = mockFetchOk({ success: true, data: {} });
     const { dispatchTool } = await loadDispatcher();
