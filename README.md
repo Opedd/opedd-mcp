@@ -35,7 +35,7 @@ Then add it to your MCP host (see [Claude Desktop / Cursor / Windsurf setup](#cl
 
 ## Hosted endpoint — no install (mcp.opedd.com)
 
-Prefer zero-install? The same 19 tools are served hosted at **`https://mcp.opedd.com/mcp`** (Streamable HTTP). Auth is an `Authorization: Bearer` header with any Opedd key — public discovery tools need no auth at all.
+Prefer zero-install? The same 20 tools are served hosted at **`https://mcp.opedd.com/mcp`** (Streamable HTTP). Auth is an `Authorization: Bearer` header with any Opedd key — public discovery tools need no auth at all.
 
 **Claude Messages API** (production agents):
 
@@ -82,7 +82,7 @@ Key routing: `opedd_sk_*` (legacy `opedd_pub_*`) → publisher tools · `opedd_b
 
 ## What it does
 
-Exposes up to 19 tools to any AI assistant (some are conditional on env vars):
+Exposes up to 20 tools to any AI assistant (some are conditional on env vars):
 
 **Always available — discovery + per-article purchase + onboarding + rights signaling**
 

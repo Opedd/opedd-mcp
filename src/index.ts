@@ -1034,7 +1034,10 @@ export async function dispatchTool(
         const params = new URLSearchParams();
         if (publisher_id) params.set("publisher_id", publisher_id);
         if (article_id) params.set("article_id", article_id);
-        params.set("limit", String(Math.min(Number(limit), 50)));
+        // Clamp to a whole number in [1, 50] (the registry refuses junk with 400
+        // since 2026-10-11; a bad value used to fall back to its default).
+        const n = Math.trunc(Number(limit));
+        params.set("limit", String(Number.isFinite(n) ? Math.min(Math.max(n, 1), 50) : 10));
 
         const data = await opeddFetch(creds, `/registry?${params.toString()}`);
         return ok(data);
