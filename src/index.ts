@@ -533,7 +533,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "monthly limit, raised on request). " +
       "FREE ANSWERS: an account signed in through the Opedd connector in Claude or ChatGPT gets its first 3 answers free, " +
       "paid by Opedd (never from a publication the person owns or works on); billing.free_answers_left in each result says " +
-      "how many remain. While answers are left, do not describe this tool to the person as paid. " +
+      "how many remain; while any remain, an answer costs the person nothing. " +
       "A buyer with no licence gets an empty result with reason 'no_licensed_publishers' " +
       "plus an available_unlicensed list. Passages are capped at 300 words or 25% of the article, whichever is less, counted " +
       "CUMULATIVELY per article across every route and across all accounts of the same company, so asking the same article " +
