@@ -67,25 +67,31 @@ function parsePayload(result: { content: Array<{ text: string }>; isError?: bool
 // ───────────────────────────── TOOLS array shape ─────────────────────────────
 
 describe("TOOLS array (metadata)", () => {
-  it("exports 8 always-available tools (no env-var gate required)", async () => {
-    // Clear env-gated vars so only the always-available bucket registers
+  it("lists all 20 tools even with no keys set (0.12.4: same list as the hosted gateway)", async () => {
     vi.unstubAllEnvs();
     vi.stubEnv("OPEDD_BUYER_EMAIL", TEST_BUYER_EMAIL);
     const { TOOLS } = await loadDispatcher();
     const names = TOOLS.map((t) => t.name);
-    // Always-available: lookup_content, purchase_license, verify_license,
-    // browse_registry, publisher_directory, place_licence_order,
-    // rsl_get, detect_platform
-    expect(names).toContain("lookup_content");
-    expect(names).toContain("purchase_license");
-    expect(names).toContain("verify_license");
-    expect(names).toContain("browse_registry");
-    expect(names).toContain("publisher_directory");
-    expect(names).toContain("place_licence_order");
+    for (const n of [
+      "lookup_content", "search_content", "purchase_license", "verify_license", "browse_registry",
+      "publisher_directory", "detect_platform", "rsl_get", "place_licence_order", "search_passages",
+      "get_content", "list_feed", "stream_feed_ndjson", "list_licence_orders", "get_audit_events",
+      "get_buyer_account", "article_53_attestation", "get_compliance_dossier", "list_publisher_content", "push_content",
+    ]) expect(names).toContain(n);
     expect(names).not.toContain("purchase_enterprise_license");
-    expect(names).toContain("rsl_get");
-    expect(names).toContain("detect_platform");
-    expect(names.length).toBeGreaterThanOrEqual(8);
+    expect(names).toHaveLength(20);
+  });
+
+  it("a key-only tool called without a key says how to get one and sends nothing", async () => {
+    vi.unstubAllEnvs();
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const { dispatchTool, envCredentials } = await loadDispatcher();
+    const res = await dispatchTool("get_content", { article_id: "00000000-0000-0000-0000-000000000001" }, envCredentials());
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toMatch(/OPEDD_BUYER_TOKEN|buyer API (token|key)/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 
   it("every tool carries name + description + inputSchema", async () => {

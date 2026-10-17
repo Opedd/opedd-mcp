@@ -958,12 +958,14 @@ function annotate(tool: Tool): Tool {
   return { ...tool, title, annotations: { title, ...rest } };
 }
 
-// stdio: credential-gated list (only tools the local env can use).
+// stdio lists every tool, like the hosted gateway (0.12.4, 2026-10-17). It
+// used to list only the tools the local env had keys for, so a directory that
+// starts the server without keys to read its tools (Glama) showed 9 of 20.
+// Listing a tool grants nothing: a tool that needs a key answers with a
+// clear "needs a key, here's how to get one" message, locally, before any
+// request is sent, and the API checks every key on every call regardless.
 export const TOOLS: Tool[] = buildTools({
-  buyerToken: !!ENV_CREDS.buyerToken,
-  accessKey: !!ENV_CREDS.accessKey,
-  buyerJwt: !!ENV_CREDS.buyerJwt,
-  pubBearer: !!(ENV_CREDS.pubBearer || ENV_CREDS.apiKey),
+  buyerToken: true, accessKey: true, buyerJwt: true, pubBearer: true,
 });
 
 // hosted gateway: advertise ALL tools; per-request creds decide what
