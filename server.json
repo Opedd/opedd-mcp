@@ -43,7 +43,7 @@
         },
         {
           "name": "OPEDD_BUYER_JWT",
-          "description": "Buyer portal session JWT \u2014 enables account, audit, compliance + EU AI Act attestation tools",
+          "description": "Buyer portal session JWT \u2014 enables account, audit, compliance and attestation tools",
           "isRequired": false,
           "isSecret": true
         },
