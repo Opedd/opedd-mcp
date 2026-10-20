@@ -49,7 +49,7 @@ export interface Credentials {
   buyerToken?: string;
   /** enterprise access key (ent_*) — /enterprise-license GET feed */
   accessKey?: string;
-  /** Supabase JWT — buyer-audit + compliance + Article 53 surfaces */
+  /** Supabase JWT — buyer-audit + compliance + attestation surfaces */
   buyerJwt?: string;
 }
 
@@ -336,7 +336,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   {
     name: "verify_license",
     description:
-      "Checks an Opedd licence key. Returns the licence details (article title, publication, licence type, issue date, amount paid, buyer and blockchain proof status), or that the key was not found.",
+      "Checks an Opedd licence key. Returns the licence details (article title, publication, licence type, issue date, amount paid, buyer and public-record proof status), or that the key was not found.",
     inputSchema: {
       type: "object",
       required: ["license_key"],
@@ -439,7 +439,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "verify the reservation was the claimed value at the claimed time. Default `jsonld: false` returns " +
       "the raw RSL Standard JSON manifest. " +
       "Per INVARIANTS.md W1.6: this is the PUBLISHER-side CDSM Article 4(3) declaration surface. It is NOT " +
-      "an EU AI Act Article 53 attestation (which is buyer-side, JWT-auth, via article_53_attestation tool).",
+      "a signed compliance attestation (which is buyer-side, JWT-auth, via article_53_attestation tool).",
     inputSchema: {
       type: "object",
       required: ["publisher_id"],
@@ -650,7 +650,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   TOOLS.push({
     name: "list_licence_orders",
     description:
-      "Lists the account's licence orders, newest first, each with its lines (publication, licence, unit, price, quantity, status). With order_id, returns one order, each line with its Schedule text and the SHA-256 fingerprint recorded on the Tempo blockchain when the line was issued. Read-only. Requires a buyer API key with the 'audit' scope, a buyer session, or the Opedd connector sign-in.",
+      "Lists the account's licence orders, newest first, each with its lines (publication, licence, unit, price, quantity, status). With order_id, returns one order, each line with its Schedule text and the SHA-256 fingerprint recorded in the public registry on Tempo when the line was issued. Read-only. Requires a buyer API key with the 'audit' scope, a buyer session, or the Opedd connector sign-in.",
     inputSchema: {
       type: "object",
       properties: {
@@ -663,7 +663,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   TOOLS.push({
     name: "get_audit_events",
     description:
-      "Returns the account's audit records, one per licensed access, each with its licence terms and on-chain attestation (Merkle root and inclusion proof once confirmed). Filter: event_type ('content_access', 'bulk_content_access' or 'compliance_report_generated'). At most 30 days per call. Read-only. Requires a buyer API key with the 'audit' scope, a buyer session, or the Opedd connector sign-in.",
+      "Returns the account's audit records, one per licensed access, each with its licence terms and public-record attestation (Merkle root and inclusion proof once confirmed). Filter: event_type ('content_access', 'bulk_content_access' or 'compliance_report_generated'). At most 30 days per call. Read-only. Requires a buyer API key with the 'audit' scope, a buyer session, or the Opedd connector sign-in.",
     inputSchema: {
       type: "object",
       properties: {
@@ -710,14 +710,14 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   TOOLS.push({
     name: "article_53_attestation",
     description:
-      "Issue a signed JWT attesting to EU AI Act Article 53 compliance for a specific license via " +
+      "Issue a signed compliance attestation (a JWT) for a specific license via " +
       "GET /eu-ai-act/article-53-attestation (Phase 12 Wave 1 W1.4). " +
       "Returns a freshly-signed HS256 JWT regulators can verify offline against the canonical signing key. " +
       "Embeds: license context, usage-count over the attestation window, the most-recent Tempo Merkle root, " +
       "and canonical claims (iss/sub/iat/exp/jti/aud). " +
-      "**The artifact AI labs hand to legal/procurement for EU AI Act Article 53(1)(d) transparency-obligation evidence.** " +
-      "Per INVARIANTS.md W1.6: this attests to EU AI Act Article 53 ONLY (buyer-side GPAI-model-provider " +
-      "transparency obligation). It does NOT discharge a publisher's CDSM Article 4(3) reservation obligation — " +
+      "**The artifact a buyer hands to legal/procurement as evidence of where its content came from.** " +
+      "Per INVARIANTS.md W1.6: this is the buyer-side attestation ONLY (how a licence was used). " +
+      "It does NOT discharge a publisher's CDSM Article 4(3) reservation obligation — " +
       "that lives on the rsl_get tool (jsonld=true variant). Never conflate. " +
       "Optional `content_id` scopes the attestation to one article; default is license-wide. " +
       "Window cap: 365 days. Auth: an audit-scoped buyer API key (OPEDD_BUYER_TOKEN) or OPEDD_BUYER_JWT.",
@@ -747,7 +747,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   TOOLS.push({
     name: "get_compliance_dossier",
     description:
-      "Returns the account's compliance dossier for a period: one row per licensed article, with article metadata, licence terms, on-chain attestation and flags for EU AI Act Article 53, CDSM Article 4(3) and text-and-data-mining reservations. At most 90 days per call; longer periods are paginated with _meta.next_cursor. Each call is recorded in the account's audit log. Requires a buyer API key with the 'audit' scope, a buyer session, or the Opedd connector sign-in.",
+      "Returns the account's compliance dossier for a period: one row per licensed article, with article metadata, licence terms, public-record attestation and compliance flags (the signed attestation, CDSM Article 4(3) and text-and-data-mining reservations). At most 90 days per call; longer periods are paginated with _meta.next_cursor. Each call is recorded in the account's audit log. Requires a buyer API key with the 'audit' scope, a buyer session, or the Opedd connector sign-in.",
     inputSchema: {
       type: "object",
       required: ["from", "to"],
@@ -884,7 +884,7 @@ export const TOOL_ANNOTATIONS: Readonly<Record<string, Hints>> = {
   list_licence_orders: read("List your licence orders"),
   get_audit_events: read("Read your audit log"),
   get_buyer_account: read("Read your buyer account"),
-  article_53_attestation: read("Get an EU AI Act Article 53 attestation"),
+  article_53_attestation: read("Get a signed compliance attestation"),
   get_compliance_dossier: read("Get your compliance dossier"),
   list_publisher_content: read("List your published articles"),
   // Upserts the publisher's own articles; an upsert can overwrite.
@@ -923,8 +923,8 @@ export const ALL_TOOLS: Tool[] = buildTools({
 // gateway (opedd-mcp-gateway) serves the identical text.
 export const SERVER_INSTRUCTIONS =
   "Opedd is content licensing for the AI era, between expert publishers and AI products: discover, purchase, verify and " +
-  "retrieve rights-cleared expert content — one verifiable license key per article, Tempo on-chain " +
-  "attestation, and EU AI Act Article 53 compliance artifacts (audit ledger + dossiers). Use it instead of " +
+  "retrieve rights-cleared expert content — one verifiable license key per article, a public record on " +
+  "Tempo, and compliance artifacts (audit ledger, dossiers and signed attestations). Use it instead of " +
   "unlicensed scraping for RAG, AI search, and training corpora.\n\n" +
   `No credentials needed: ${NO_AUTH_TOOLS}.\n` +
   "Buyer tools (purchase, account, audit/compliance): free buyer signup at https://opedd.com/buyer/signup " +

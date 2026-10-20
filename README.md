@@ -21,9 +21,9 @@
   <a href="https://opedd.com/for-ai-agents?utm_source=github&utm_medium=readme&utm_campaign=mcp"><img src="https://img.shields.io/badge/Docs-opedd.com-111" alt="Docs"></a>
 </p>
 
-Lets AI assistants (Claude Desktop, Cursor, Windsurf, or any MCP-compatible host) discover, purchase, and verify content licenses autonomously — mid-conversation, without opening a browser. Every license is registered on-chain (Tempo blockchain) with cryptographic proof.
+Lets AI assistants (Claude Desktop, Cursor, Windsurf, or any MCP-compatible host) discover, purchase, and verify content licenses autonomously — mid-conversation, without opening a browser. Every license is recorded in a public registry on Tempo, with cryptographic proof.
 
-**Unlike generic search APIs**, Opedd returns content with a verifiable license key — defensible under the EU AI Act and any copyright jurisdiction.
+**Unlike generic search APIs**, Opedd returns content with a verifiable license key — with the rights cleared and a record you can show your legal team.
 
 ## Quick start
 
@@ -94,7 +94,7 @@ Every tool carries a `title` and MCP annotations (`readOnlyHint`, `destructiveHi
 | `search_passages` | **Paid per answer, or included in a monthly subscription.** Ask a question, get licensed passages that answer it, with citations. Per-question licences: charged once per publisher per question at that publisher's own price, capped at 300 words or 25% of the article, counted cumulatively. Monthly AI answers subscriptions (v0.12.0): included, not capped, from the subscription's start. Narrow with `publishers`, `published_after`, `published_before`, `max_results` (1–25). Needs a buyer key with the `search` scope. Re-asking within 24h is free |
 | `lookup_content` | Look up an article by URL — returns title, publisher, pricing |
 | `purchase_license` | Buy a Human republication licence for one article via Stripe — returns OP-XXXX-XXXX key. Requires `terms_accepted: true` (genuine buyer assent to opedd.com/terms; recorded with the licence) |
-| `verify_license` | Verify a license key — returns validity, article, publisher, blockchain proof |
+| `verify_license` | Verify a license key — returns validity, article, publisher, public-record proof |
 | `browse_registry` | Browse the public Opedd registry — lists issued LICENSES (use `publisher_directory` to browse publishers themselves) |
 | `publisher_directory` | Browse the public Opedd publisher catalog — paginated publishers with article counts + pricing + sample articles (primary buyer-discovery surface for AI labs) |
 | `place_licence_order` | Place a licence order for one or more publishers: AI answers (`monthly` full text, or `metered` pay-per-request snippets ≤300 words / 25%), Full catalogue (`archive`, `one_time`: everything published up to the order date, kept permanently, no AI training), AI training (`one_time`, back catalogue), client display (`monthly` × end clients). Optional `include_archive: true` on a monthly AI answers order adds each publisher's Full catalogue for complete access. Each publisher is its own Schedule at its own price; returns the order, lines, `unavailable` publishers and `hosted_invoice_url`. Needs `OPEDD_BUYER_JWT` and `terms_accepted: true` |
@@ -114,15 +114,15 @@ Every tool carries a `title` and MCP annotations (`readOnlyHint`, `destructiveHi
 | `list_feed` | List the articles a licence order covers, with `since` delta-feed support. AI training and Full catalogue orders carry full `content_body` (`content_access: "included"`); monthly orders are discovery-only (`content_access: "retrieval_per_article"`, fetch text via `get_content`); per-request orders are `"search_only"`. With a buyer key, pass `order_id` (optional when the account holds one active order) |
 | `stream_feed_ndjson` | Bulk-export up to 1000 articles per call via NDJSON wire format. Same content contract and credentials as `list_feed` |
 
-**Requires `OPEDD_BUYER_JWT` (Supabase JWT) — buyer account + audit + compliance + EU AI Act surfaces**
+**Requires `OPEDD_BUYER_JWT` (Supabase JWT) — buyer account + audit + compliance + attestation surfaces**
 
 | Tool | Description |
 |------|-------------|
 | `get_buyer_account` | Fetch buyer profile + masked API key list — buyer-dashboard mental model |
 | `list_licence_orders` | The buyer's licence orders and lines; with `order_id`, each line's Schedule document and its SHA-256 (the fingerprint recorded on Tempo). Also works with an audit-scoped `OPEDD_BUYER_TOKEN` |
-| `get_audit_events` | Per-event audit ledger with Tempo on-chain attestation inclusion proofs inline (Phase 9.x + 10 M5) |
+| `get_audit_events` | Per-event audit ledger with public-record (Tempo) inclusion proofs inline (Phase 9.x + 10 M5) |
 | `get_compliance_dossier` | Procurement-defense compliance dossier mapping retrievals to license terms (Phase 11 M4) |
-| `article_53_attestation` | Signed JWT attesting EU AI Act Article 53(1)(d) compliance for a license — the artifact AI labs hand to legal/procurement (Phase 12 W1.4) |
+| `article_53_attestation` | Signed compliance attestation (JWT) for a license — the artifact a buyer hands to legal/procurement (Phase 12 W1.4) |
 
 **Requires `OPEDD_PUB_BEARER` (opedd_sk_*; legacy opedd_pub_* still works) — publisher-side**
 
@@ -131,13 +131,13 @@ Every tool carries a `title` and MCP annotations (`readOnlyHint`, `destructiveHi
 | `list_publisher_content` | List your own articles with pricing and stats |
 | `push_content` | Push your articles to Opedd so AI buyers can license them — 1–100 per call (`title`/`url`/`html_body` required, everything else optional). Onboard your back-catalogue or new posts with no code, straight from your AI assistant. |
 
-### Regulatory framing (CDSM Article 4 vs EU AI Act Article 53 — never conflated)
+### Compliance artifacts (publisher-side vs buyer-side — never conflated)
 
 Per Opedd's platform invariants (W1.6 amendment):
 
 - **`rsl_get(publisher_id, jsonld=true)`** → publisher-side **CDSM Article 4(3)** opt-out declaration (signed JSON-LD receipt over the reservation state).
-- **`article_53_attestation(license_id)`** → buyer-side **EU AI Act Article 53** attestation (signed HS256 JWT scoped to one license).
-- **`get_compliance_dossier(from, to)`** → comprehensive procurement-defense dossier covering BOTH frameworks (publisher CDSM reservation honored + buyer Article 53 evidence chain).
+- **`article_53_attestation(license_id)`** → buyer-side **signed compliance attestation** (HS256 JWT scoped to one license).
+- **`get_compliance_dossier(from, to)`** → comprehensive procurement-defense dossier covering BOTH sides (publisher CDSM reservation honored + buyer attestation evidence chain).
 
 These serve different audit-defensibility modes and never share wire format. Tool descriptions cite the W1.6 invariant inline.
 
@@ -242,7 +242,7 @@ Once configured, you can ask your AI assistant:
 
 > "Get me a CDSM Article 4(3) signed receipt for that publisher's reservation state — set `jsonld: true`." — uses `rsl_get` with content negotiation
 
-> "Generate an EU AI Act Article 53 attestation JWT for our license `11111111-...` covering the last 90 days. I need the artifact for our procurement audit committee." — uses `article_53_attestation` (requires `OPEDD_BUYER_JWT`)
+> "Generate a signed compliance attestation for our license `11111111-...` covering the last 90 days. I need the artifact for our procurement audit committee." — uses `article_53_attestation` (requires `OPEDD_BUYER_JWT`)
 
 > "This publisher just signed up: `https://noahpinion.substack.com`. Which onboarding workflow should we use?" — uses `detect_platform`
 
@@ -270,12 +270,12 @@ npm run build # compiles to dist/
 
 | | Opedd | Generic search APIs |
 |---|---|---|
-| **What you get** | Licensed content + license key + on-chain proof — all in one API call | Scraped web content, no rights |
+| **What you get** | Licensed content + license key + public-record proof — all in one API call | Scraped web content, no rights |
 | **Content delivery** | Full article text via API (JSON) — bulk on flat-fee licenses, per-call (metered) on filtered licenses; real-time feed via webhooks | Scraped snippets or full-page dumps |
 | **Content quality** | Curated publisher content (niche B2B newsletters, expert analysis) | Whatever's on the open web |
 | **Rights** | Verifiable license key per article, publisher-authorized | No rights clearance |
-| **Proof** | On-chain (Tempo blockchain) — independently verifiable | None |
-| **EU AI Act** | Compliant — full training data provenance chain | No provenance |
+| **Proof** | Public record (Tempo) — independently verifiable | None |
+| **Compliance** | Signed attestation + full provenance chain | No provenance |
 | **Pricing** | Publisher sets their own price per article | Platform decides |
 | **Delivery modes** | Per-article API, bulk feed (JSON firehose), buyer webhooks (push) | Query-response only |
 | **Protocol** | REST + MCP native | REST only |
@@ -286,7 +286,7 @@ Opedd is the **licensed content delivery layer** for AI — not just a licensing
 
 - [Opedd for AI Agents](https://opedd.com/for-ai-agents?utm_source=github&utm_medium=readme&utm_campaign=mcp) — full documentation, code examples, endpoint reference
 - [API Docs](https://docs.opedd.com) — OpenAPI spec with agent endpoints
-- [Opedd Registry](https://opedd.com/registry?utm_source=github&utm_medium=readme&utm_campaign=mcp) — browse on-chain license proofs
+- [Verify a licence](https://opedd.com/verify?utm_source=github&utm_medium=readme&utm_campaign=mcp) — check any licence key in the public record
 
 ## License
 
