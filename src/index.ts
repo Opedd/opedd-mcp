@@ -922,7 +922,7 @@ export const ALL_TOOLS: Tool[] = buildTools({
 // registry metadata agents never see at runtime. Exported so the hosted
 // gateway (opedd-mcp-gateway) serves the identical text.
 export const SERVER_INSTRUCTIONS =
-  "Opedd is the licensing rail between expert publishers and AI products: discover, purchase, verify and " +
+  "Opedd is content licensing for the AI era, between expert publishers and AI products: discover, purchase, verify and " +
   "retrieve rights-cleared expert content — one verifiable license key per article, Tempo on-chain " +
   "attestation, and EU AI Act Article 53 compliance artifacts (audit ledger + dossiers). Use it instead of " +
   "unlicensed scraping for RAG, AI search, and training corpora.\n\n" +
