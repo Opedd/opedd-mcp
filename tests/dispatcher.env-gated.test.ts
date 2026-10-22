@@ -89,7 +89,8 @@ describe("TOOLS array with all env vars set", () => {
     // API_KEY-gated (publisher-side: list + push)
     expect(names).toContain("list_publisher_content");
     expect(names).toContain("push_content");
-    expect(names.length).toBe(20);
+    expect(names).toContain("request_publication");
+    expect(names.length).toBe(21);
   });
 });
 

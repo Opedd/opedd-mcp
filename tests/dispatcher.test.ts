@@ -67,7 +67,7 @@ function parsePayload(result: { content: Array<{ text: string }>; isError?: bool
 // ───────────────────────────── TOOLS array shape ─────────────────────────────
 
 describe("TOOLS array (metadata)", () => {
-  it("lists all 20 tools even with no keys set (0.12.4: same list as the hosted gateway)", async () => {
+  it("lists all 21 tools even with no keys set (0.12.4: same list as the hosted gateway)", async () => {
     vi.unstubAllEnvs();
     vi.stubEnv("OPEDD_BUYER_EMAIL", TEST_BUYER_EMAIL);
     const { TOOLS } = await loadDispatcher();
@@ -77,9 +77,10 @@ describe("TOOLS array (metadata)", () => {
       "publisher_directory", "detect_platform", "rsl_get", "place_licence_order", "search_passages",
       "get_content", "list_feed", "stream_feed_ndjson", "list_licence_orders", "get_audit_events",
       "get_buyer_account", "article_53_attestation", "get_compliance_dossier", "list_publisher_content", "push_content",
+      "request_publication",
     ]) expect(names).toContain(n);
     expect(names).not.toContain("purchase_enterprise_license");
-    expect(names).toHaveLength(20);
+    expect(names).toHaveLength(21);
   });
 
   it("a key-only tool called without a key says how to get one and sends nothing", async () => {
@@ -161,12 +162,59 @@ describe("dispatchTool: lookup_content", () => {
     expect(result.content[0].text).toContain("url is required");
   });
 
-  it("propagates 404 as error response", async () => {
-    mockFetchErr({ success: false, error: "Article not found" }, 404);
+  it("a 404 is an answer, not an error: not on Opedd yet, with request_publication (2026-10-22)", async () => {
+    mockFetchErr({ success: false, error: { code: "NOT_FOUND", message: "Article not found for the given URL" } }, 404);
     const { dispatchTool } = await loadDispatcher();
-    const result = await dispatchTool("lookup_content", { url: "https://no.example" });
+    const result = await dispatchTool("lookup_content", { url: "https://no.example/a" });
+    expect(result.isError).toBeUndefined();
+    const payload = parsePayload(result);
+    expect(payload.on_opedd).toBe(false);
+    expect(payload.url).toBe("https://no.example/a");
+    expect(String(payload.message)).toContain("request_publication");
+    expect(String(payload.message).toLowerCase()).not.toContain("coming soon");
+  });
+
+  it("other failures stay errors", async () => {
+    mockFetchErr({ success: false, error: { code: "INTERNAL", message: "Lookup failed" } }, 500);
+    const { dispatchTool } = await loadDispatcher();
+    const result = await dispatchTool("lookup_content", { url: "https://no.example/a" });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain("Article not found");
+    expect(result.content[0].text).toContain("Lookup failed");
+  });
+});
+
+// ─────────────────────────── request_publication ───────────────────────────
+
+describe("dispatchTool: request_publication", () => {
+  it("POSTs the request to /publication-request and returns the backend's answer", async () => {
+    const f = mockFetchOk({ success: true, data: { recorded: true, already_requested: false, on_opedd: false, publication: "stratechery.com" } });
+    const { dispatchTool } = await loadDispatcher();
+    const result = await dispatchTool("request_publication", {
+      url: "https://stratechery.com/2026/x", email: "ana@fund.com", organization: "Fund",
+    });
+    const [calledUrl, init] = (f as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(String(calledUrl)).toBe("https://api.opedd.com/publication-request");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toMatchObject({ url: "https://stratechery.com/2026/x", email: "ana@fund.com", organization: "Fund" });
+    expect(parsePayload(result)).toMatchObject({ recorded: true, publication: "stratechery.com" });
+  });
+
+  it("needs url and email, and sends nothing without them", async () => {
+    const f = mockFetchOk({});
+    const { dispatchTool } = await loadDispatcher();
+    expect((await dispatchTool("request_publication", { email: "a@b.co" })).isError).toBe(true);
+    const noEmail = await dispatchTool("request_publication", { url: "https://x.com" });
+    expect(noEmail.isError).toBe(true);
+    expect(noEmail.content[0].text).toContain("email is required");
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("needs no key", async () => {
+    vi.unstubAllEnvs();
+    mockFetchOk({ success: true, data: { recorded: true } });
+    const { dispatchTool, envCredentials } = await loadDispatcher();
+    const result = await dispatchTool("request_publication", { url: "https://x.com", email: "a@b.co" }, envCredentials());
+    expect(result.isError).toBeUndefined();
   });
 });
 
