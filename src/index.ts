@@ -105,7 +105,9 @@ async function opeddFetch(creds: Credentials, path: string, options: RequestInit
     } catch {
       // non-JSON error body — keep the HTTP-status default
     }
-    throw new Error(msg);
+    // The status rides on the error so a caller can treat one status as an
+    // answer (lookup_content: 404 = not on Opedd yet) without parsing text.
+    throw Object.assign(new Error(msg), { status: res.status });
   }
   return await res.json();
 }
@@ -182,7 +184,7 @@ function err(msg: string): ToolResult {
 // channels (env var locally, Authorization header on the hosted gateway),
 // where credentials come from, and which tools need none.
 const NO_AUTH_TOOLS =
-  "lookup_content, publisher_directory, verify_license, browse_registry, rsl_get, detect_platform";
+  "lookup_content, publisher_directory, verify_license, browse_registry, rsl_get, detect_platform, request_publication";
 
 function credErr(missing: string, envVar: string, howToGet: string): ToolResult {
   return err(
@@ -250,7 +252,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   {
     name: "lookup_content",
     description:
-      "Looks up an article on Opedd by its web address. Returns the title, publication, available licence types and prices, or that the article is not on Opedd.",
+      "Looks up an article on Opedd by its web address. Returns the title, publication, available licence types and prices, or that it is not on Opedd yet (then request_publication records the request).",
     inputSchema: {
       type: "object",
       required: ["url"],
@@ -259,6 +261,22 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
           type: "string",
           description: "The canonical URL of the article or content to look up",
         },
+      },
+    },
+  },
+  {
+    name: "request_publication",
+    description:
+      "Asks Opedd to tell you when a publication it does not carry yet becomes available to license. Use it after lookup_content says an article is not on Opedd. Records the request against the email given; nothing is bought. If the publication is already on Opedd, returns its licensing page instead. Free; no key needed.",
+    inputSchema: {
+      type: "object",
+      required: ["url", "email"],
+      properties: {
+        url: { type: "string", description: "The web address of the publication or of one of its articles." },
+        email: { type: "string", description: "Where Opedd should write when the publication is available (the user's email, with their consent)." },
+        name: { type: "string", description: "Optional: the requester's name." },
+        organization: { type: "string", description: "Optional: the requester's company or fund." },
+        note: { type: "string", description: "Optional: what the content is needed for (max 1000 characters)." },
       },
     },
   },
@@ -868,6 +886,8 @@ type Hints = { title: string; readOnlyHint: boolean; destructiveHint: boolean; i
 const read = (title: string): Hints => ({ title, readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false });
 export const TOOL_ANNOTATIONS: Readonly<Record<string, Hints>> = {
   lookup_content: read("Look up an article's licence and price"),
+  // Writes one request row (a repeat for the same email writes nothing): not read-only, idempotent.
+  request_publication: { title: "Ask to be told when a publication is available", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   search_content: read("Find who covers a topic (free, no text)"),
   purchase_license: { title: "Buy an article licence", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   verify_license: read("Verify a licence key"),
@@ -978,11 +998,41 @@ export async function dispatchTool(
         const { url } = args as { url: string };
         if (!url) return err("url is required");
 
-        const data = await opeddFetch(
-          creds,
-          `/lookup-article?url=${encodeURIComponent(url)}`
-        );
-        return ok(data);
+        try {
+          const data = await opeddFetch(
+            creds,
+            `/lookup-article?url=${encodeURIComponent(url)}`
+          );
+          return ok(data);
+        } catch (e) {
+          // A miss is an answer, not a failure (2026-10-22). Directories score
+          // servers on error rates, and the honest reply is "not on Opedd yet"
+          // with a way to ask for it, never "coming soon".
+          if ((e as { status?: number }).status === 404) {
+            return ok({
+              on_opedd: false,
+              url,
+              message:
+                "This article is not on Opedd yet. If you want to license this publication, call request_publication " +
+                "with this url and an email, and Opedd will write when it becomes available.",
+            });
+          }
+          throw e;
+        }
+      }
+
+      // ── request_publication ────────────────────────────────────────────────
+      case "request_publication": {
+        const { url, email, name, organization, note } = args as {
+          url?: string; email?: string; name?: string; organization?: string; note?: string;
+        };
+        if (!url) return err("url is required");
+        if (!email) return err("email is required: Opedd writes to it when the publication is available");
+        const envelope = (await opeddFetch(creds, "/publication-request", {
+          method: "POST",
+          body: JSON.stringify({ url, email, name, organization, note }),
+        })) as { data?: unknown };
+        return ok(envelope.data ?? envelope);
       }
 
       // ── search_content ─────────────────────────────────────────────────────
