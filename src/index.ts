@@ -426,7 +426,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   {
     name: "detect_platform",
     description:
-      "Detect the content platform behind a URL via POST /detect-platform (Phase 12 Wave 3 W3.1). " +
+      "For publishers: detect the content platform behind a URL. " +
       "Public no-auth lookup. Given a URL, identifies what platform powers it " +
       "(Substack / Beehiiv / Ghost / Medium / Brevo / custom) and returns the suggested onboarding workflow. " +
       "Hostname-detectable platforms (Substack subdomain, Beehiiv suffix, etc.) resolve in milliseconds; " +
@@ -450,7 +450,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   {
     name: "rsl_get",
     description:
-      "Fetch a publisher's RSL Standard manifest via GET /rsl-manifest (Phase 12 Wave 1 W1.1). " +
+      "Fetch a publisher's RSL Standard manifest (machine-readable licensing terms). " +
       "Public no-auth endpoint — discovery surface for AI agents/crawlers wanting to know what's licensable " +
       "from a publisher BEFORE going through the buyer-account signup flow. " +
       "Returns the 4 canonical license types (ai_retrieval, ai_training, human_per_article, human_full_archive) " +
@@ -459,8 +459,8 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "CDSM Article 4(3) reservation state + `tdm:reservationSignedAt` timestamp — regulators can post-hoc " +
       "verify the reservation was the claimed value at the claimed time. Default `jsonld: false` returns " +
       "the raw RSL Standard JSON manifest. " +
-      "Per INVARIANTS.md W1.6: this is the PUBLISHER-side CDSM Article 4(3) declaration surface. It is NOT " +
-      "a signed compliance attestation (which is buyer-side, JWT-auth, via article_53_attestation tool).",
+      "This is the publisher's own declaration. It is not a compliance attestation for a buyer " +
+      "(use article_53_attestation for that).",
     inputSchema: {
       type: "object",
       required: ["publisher_id"],
@@ -567,7 +567,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "retrieve articles: it answers 403 SEARCH_ONLY_LICENCE \u2014 ask a question with search_passages instead. " +
       "Articles the publisher stopped licensing answer 403 ARTICLE_EXCLUDED. " +
       "The publisher must have content delivery enabled and must have pushed content for the article. " +
-      "Phase 11 M2 RAG-extended shape: response includes 7 RAG-essential metadata fields — author, language, word_count, content_hash, image_urls, canonical_url, tags. " +
+      "The response includes author, language, word_count, content_hash, image_urls, canonical_url and tags. " +
       "On pre-2026-05-14 historical articles, optional fields (author/language/image_urls/canonical_url/tags) may be NULL. " +
       "NULL means 'data unavailable for this article', NOT 'explicitly empty' — treat as data-missing when filtering; do not interpret as anti-match.",
     inputSchema: {
@@ -593,7 +593,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   TOOLS.push({
     name: "list_feed",
     description:
-      "List articles from a buyer's licensed catalog via GET /enterprise-license (Phase 10 + 11). " +
+      "List the articles in a licence order you hold. " +
       "Content contract: AI training orders include full content_body for the back catalogue up to the order date " +
       "(content_access 'included'). Every other order is discovery-only (content_body null): AI answers monthly and " +
       "client display fetch text per article via get_content (content_access 'retrieval_per_article'); pay-per-request " +
@@ -630,11 +630,11 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   TOOLS.push({
     name: "stream_feed_ndjson",
     description:
-      "Bulk-export a buyer's licensed catalog via GET /enterprise-license?format=ndjson (Phase 11 M3). " +
+      "Bulk-export the articles in a licence order you hold. " +
       "Returns up to 1000 articles per call (collected from line-delimited JSON wire format). " +
       "Same content contract as list_feed: full text for AI training orders only; every other order exports " +
       "metadata (content_body null) — use get_content for article text. " +
-      "Each article emits one usage_records row (analytics-only sentinel 'bulk-export:<request_id>:<article_id>' — not metered-billable per the revenue-model bifurcation invariant). " +
+      "Each exported article is recorded for analytics; a bulk export is not billed per article. " +
       "Use `since` (ISO 8601) for delta-feed. Use `cursor` to paginate beyond 1000. " +
       "Backend supports 5000 articles per call; the MCP cap is 1000 for transport reasonability. " +
       "Real bulk-ingest pipelines should use the Python SDK (pip install opedd) directly — not via MCP. " +
@@ -731,15 +731,12 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   TOOLS.push({
     name: "article_53_attestation",
     description:
-      "Issue a signed compliance attestation (a JWT) for a specific license via " +
-      "GET /eu-ai-act/article-53-attestation (Phase 12 Wave 1 W1.4). " +
+      "Issue a signed compliance attestation (a JWT) for a licence you hold. " +
       "Returns a freshly-signed HS256 JWT regulators can verify offline against the canonical signing key. " +
       "Embeds: license context, usage-count over the attestation window, the most-recent Tempo Merkle root, " +
       "and canonical claims (iss/sub/iat/exp/jti/aud). " +
       "**The artifact a buyer hands to legal/procurement as evidence of where its content came from.** " +
-      "Per INVARIANTS.md W1.6: this is the buyer-side attestation ONLY (how a licence was used). " +
-      "It does NOT discharge a publisher's CDSM Article 4(3) reservation obligation — " +
-      "that lives on the rsl_get tool (jsonld=true variant). Never conflate. " +
+      "It attests how your licence was used; the publisher's own licensing declaration is rsl_get. " +
       "Optional `content_id` scopes the attestation to one article; default is license-wide. " +
       "Window cap: 365 days. Auth: an audit-scoped buyer API key (OPEDD_BUYER_TOKEN) or OPEDD_BUYER_JWT.",
     inputSchema: {
@@ -1176,10 +1173,10 @@ export async function dispatchTool(
         const token = argToken || creds.buyerToken;
         if (!token) {
           return err(
-            "A buyer API key with the 'search' scope is required (or set OPEDD_BUYER_TOKEN). " +
-            "Create one at opedd.com/buyer \u2192 Account \u2192 API keys \u2192 Create, ticking 'search'. " +
-            "You also need an active per-question licence for each publisher you want searched \u2014 " +
-            "use search_content to find them and place_licence_order to buy."
+            "This needs an Opedd buyer key. Sign up at https://opedd.com/buyer/signup (about two minutes): " +
+            "new accounts start with up to 3 free answers, then each answer is billed at the publication's own price. " +
+            "Then pass the key as Authorization: Bearer <key> (hosted server https://mcp.opedd.com/mcp) or " +
+            "OPEDD_BUYER_TOKEN (local). To see what Opedd covers first, use search_content or publisher_directory (free, no key)."
           );
         }
 
