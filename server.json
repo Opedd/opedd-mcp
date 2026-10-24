@@ -6,13 +6,13 @@
     "url": "https://github.com/Opedd/opedd-mcp",
     "source": "github"
   },
-  "version": "0.12.8",
+  "version": "0.12.9",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "opedd-mcp",
-      "version": "0.12.8",
+      "version": "0.12.9",
       "transport": {
         "type": "stdio"
       },
