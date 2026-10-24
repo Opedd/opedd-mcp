@@ -174,6 +174,33 @@ describe("dispatchTool: lookup_content", () => {
     expect(String(payload.message).toLowerCase()).not.toContain("coming soon");
   });
 
+  it("a publication's homepage: on Opedd, with its licensing page (2026-10-24)", async () => {
+    mockFetchErr({
+      success: false,
+      error: {
+        code: "NOT_FOUND",
+        message: "No single article at this address, but Embedded Finance Review licenses its work through Opedd: https://opedd.com/p/embeddedfinancereview",
+        details: {
+          on_opedd: true,
+          publication: {
+            name: "Embedded Finance Review",
+            publisher_id: "p-efr",
+            licensing_page: "https://opedd.com/p/embeddedfinancereview",
+            discovery_endpoint: "https://api.opedd.com/license-discovery?publisher_id=p-efr",
+          },
+        },
+      },
+    }, 404);
+    const { dispatchTool } = await loadDispatcher();
+    const result = await dispatchTool("lookup_content", { url: "https://www.embeddedfinancereview.com" });
+    expect(result.isError).toBeUndefined();
+    const payload = parsePayload(result);
+    expect(payload.on_opedd).toBe(true);
+    expect((payload.publication as Record<string, unknown>).licensing_page).toBe("https://opedd.com/p/embeddedfinancereview");
+    expect(String(payload.message)).toContain("Embedded Finance Review is on Opedd");
+    expect(String(payload.message)).not.toContain("request_publication");
+  });
+
   it("other failures stay errors", async () => {
     mockFetchErr({ success: false, error: { code: "INTERNAL", message: "Lookup failed" } }, 500);
     const { dispatchTool } = await loadDispatcher();

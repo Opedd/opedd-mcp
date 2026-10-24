@@ -91,6 +91,7 @@ async function opeddFetch(creds: Credentials, path: string, options: RequestInit
   // proxy must surface as "HTTP 502", not a JSON SyntaxError.
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;
+    let details: unknown;
     try {
       const errBody = await res.json();
       // Backend envelope upgraded to structured errors ({ error: { code,
@@ -98,6 +99,7 @@ async function opeddFetch(creds: Credentials, path: string, options: RequestInit
       // object into Error() rendered "[object Object]" — every agent-facing
       // failure was unreadable (launch-gaps follow-on, 2026-07-17).
       const e = (errBody as any)?.error;
+      if (typeof e === "object" && e !== null) details = e.details;
       msg =
         (typeof e === "object" && e !== null ? [e.code, e.message].filter(Boolean).join(": ") : e) ||
         (errBody as any)?.message ||
@@ -106,8 +108,9 @@ async function opeddFetch(creds: Credentials, path: string, options: RequestInit
       // non-JSON error body — keep the HTTP-status default
     }
     // The status rides on the error so a caller can treat one status as an
-    // answer (lookup_content: 404 = not on Opedd yet) without parsing text.
-    throw Object.assign(new Error(msg), { status: res.status });
+    // answer (lookup_content: 404 = not on Opedd yet) without parsing text;
+    // error.details rides too (lookup_content: the publication at that site).
+    throw Object.assign(new Error(msg), { status: res.status, details });
   }
   return await res.json();
 }
@@ -252,7 +255,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   {
     name: "lookup_content",
     description:
-      "Looks up an article on Opedd by its web address. Returns the title, publication, available licence types and prices, or that it is not on Opedd yet (then request_publication records the request).",
+      "Looks up an article on Opedd by its web address. Returns the title, publication, available licence types and prices; for a publication's homepage, the publication and its licensing page; or that it is not on Opedd yet (then request_publication records the request).",
     inputSchema: {
       type: "object",
       required: ["url"],
@@ -1009,6 +1012,21 @@ export async function dispatchTool(
           // servers on error rates, and the honest reply is "not on Opedd yet"
           // with a way to ask for it, never "coming soon".
           if ((e as { status?: number }).status === 404) {
+            // No article at this address, but the address is a publication on
+            // Opedd (its homepage, or a piece not imported yet): say so, and
+            // where to license it (2026-10-24). Agents that looked up a
+            // publication's homepage were told it was not on Opedd.
+            const details = (e as { details?: { on_opedd?: boolean; publication?: { name?: string; licensing_page?: string } } }).details;
+            if (details?.on_opedd === true && details.publication) {
+              return ok({
+                on_opedd: true,
+                url,
+                publication: details.publication,
+                message:
+                  `There is no single article at this address, but ${details.publication.name ?? "this publication"} is on Opedd. ` +
+                  "Its licences and prices are on its licensing page; use search_content or search_passages to find its articles.",
+              });
+            }
             return ok({
               on_opedd: false,
               url,
