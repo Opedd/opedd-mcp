@@ -1,6 +1,6 @@
 {
   "name": "opedd-mcp",
-  "version": "0.12.10",
+  "version": "0.12.11",
   "description": "Content licensing for the AI era. Licensed, rights-cleared content for AI agents, with a verifiable license key for every article. The MCP alternative to unlicensed scraping for RAG and AI search.",
   "type": "module",
   "main": "dist/index.js",
