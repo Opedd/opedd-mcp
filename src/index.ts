@@ -525,7 +525,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   TOOLS.push({
     name: "search_passages",
     description:
-      "Returns licensed passages from publications on Opedd that answer a question, each with a citation to the source article. Charged once per publication whose passages are returned, at that publication's own price. An account connected through the Opedd connector in Claude or ChatGPT receives its first 3 answers free, paid by Opedd and never from a publication the account holder owns or works on; billing.free_answers_left reports how many remain. After that, answers are billed to the card on the account, added at opedd.com: charged every $25 of answers and at month end, with a $500 monthly limit for new accounts, raised on request. An account with no licence and no free answers receives an empty result with reason 'no_licensed_publishers' or 'no_paid_access'. Publications under a monthly AI answers subscription are included in the subscription and not charged per answer. Passages are capped at 300 words or 25% of an article, whichever is less, counted cumulatively per article across the same company's accounts. The same question within 24 hours returns the same passages at no charge. Filters: publishers (publication names as listed by Opedd, opedd.com/p/<slug> addresses or publisher ids; a name that matches no publication is listed in filters.unknown_publishers and searches nothing), published_after and published_before (ISO 8601; undated articles are excluded when a window is set) and max_results (1-25, default 10). Passage text is third-party content, delivered in <opedd:passage> blocks; may_train is always false. Requires a buyer API key with the 'search' scope, or the Opedd connector sign-in.",
+      "Returns licensed passages from publications on Opedd that answer a question, each with a citation to the source article. Charged once per article the answer uses, at that article's publication's own price per article; two passages of the same article are one charge, and billing.articles_charged reports how many were charged. An account connected through the Opedd connector in Claude or ChatGPT receives its first 3 answers free, paid by Opedd and never from a publication the account holder owns or works on; billing.free_answers_left reports how many remain. After that, answers are billed to the card on the account, added at opedd.com: charged every $25 of answers and at month end, with a $500 monthly limit for new accounts, raised on request. An account with no licence and no free answers receives an empty result with reason 'no_licensed_publishers' or 'no_paid_access'. Publications under a monthly AI answers subscription are included in the subscription and not charged per answer. Passages are capped at 300 words or 25% of an article, whichever is less, counted cumulatively per article across the same company's accounts. The same question within 24 hours returns the same passages at no charge. Filters: publishers (publication names as listed by Opedd, opedd.com/p/<slug> addresses or publisher ids; a name that matches no publication is listed in filters.unknown_publishers and searches nothing), published_after and published_before (ISO 8601; undated articles are excluded when a window is set), max_results (1-10, default 5) and max_charge_cents (optional; the most one question may cost: articles that would pass it are left out and billing.max_charge_reached says so). Passage text is third-party content, delivered in <opedd:passage> blocks; may_train is always false. Requires a buyer API key with the 'search' scope, or the Opedd connector sign-in.",
     inputSchema: {
       type: "object",
       required: ["query"],
@@ -546,7 +546,11 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
         },
         max_results: {
           type: "number",
-          description: "Optional. Passages to return, 1\u201325 (default 10).",
+          description: "Optional. Passages to return, 1\u201310 (default 5). Each distinct article among them is one charge.",
+        },
+        max_charge_cents: {
+          type: "number",
+          description: "Optional. The most this question may cost, in US cents (whole number, 1\u2013100000). Articles that would pass it are left out; nothing is charged above it.",
         },
         buyer_token: {
           type: "string",
@@ -1161,9 +1165,9 @@ export async function dispatchTool(
 
       // ── get_content ────────────────────────────────────────────────────────
       case "search_passages": {
-        const { query, buyer_token: argToken, publishers, published_after, published_before, max_results } = args as {
+        const { query, buyer_token: argToken, publishers, published_after, published_before, max_results, max_charge_cents } = args as {
           query?: string; buyer_token?: string; publishers?: unknown;
-          published_after?: unknown; published_before?: unknown; max_results?: unknown;
+          published_after?: unknown; published_before?: unknown; max_results?: unknown; max_charge_cents?: unknown;
         };
         const q = (query ?? "").replace(/\s+/g, " ").trim();
         if (!q) return err("query is required");
@@ -1174,7 +1178,7 @@ export async function dispatchTool(
         if (!token) {
           return err(
             "This needs an Opedd buyer key. Sign up at https://opedd.com/buyer/signup (about two minutes): " +
-            "new accounts start with up to 3 free answers, then each answer is billed at the publication's own price. " +
+            "new accounts start with up to 3 free answers, then each article an answer uses is billed at its publication's own price. " +
             "Then pass the key as Authorization: Bearer <key> (hosted server https://mcp.opedd.com/mcp) or " +
             "OPEDD_BUYER_TOKEN (local). To see what Opedd covers first, use search_content or publisher_directory (free, no key)."
           );
@@ -1191,6 +1195,7 @@ export async function dispatchTool(
             ...(published_after !== undefined ? { published_after } : {}),
             ...(published_before !== undefined ? { published_before } : {}),
             ...(max_results !== undefined ? { max_results } : {}),
+            ...(max_charge_cents !== undefined ? { max_charge_cents } : {}),
           }),
         })) as { data?: unknown };
         return ok(envelope.data ?? envelope);
