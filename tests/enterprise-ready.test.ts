@@ -52,7 +52,7 @@ describe("tool annotations", () => {
 });
 
 describe("search_passages filters", () => {
-  it("forwards publishers, the date window and max_results untouched", async () => {
+  it("forwards publishers, the date window, max_results and max_charge_cents untouched", async () => {
     const f = mockFetchOk({ success: true, data: { passages: [] } });
     const { dispatchTool } = await load();
     await dispatchTool("search_passages", {
@@ -60,7 +60,8 @@ describe("search_passages filters", () => {
       publishers: ["11111111-1111-4111-8111-111111111111"],
       published_after: "2026-01-01",
       published_before: "2026-07-01",
-      max_results: 20,
+      max_results: 10,
+      max_charge_cents: 30,
     });
     const init = f.mock.calls[0][1] as RequestInit;
     expect(JSON.parse(String(init.body))).toEqual({
@@ -68,7 +69,8 @@ describe("search_passages filters", () => {
       publishers: ["11111111-1111-4111-8111-111111111111"],
       published_after: "2026-01-01",
       published_before: "2026-07-01",
-      max_results: 20,
+      max_results: 10,
+      max_charge_cents: 30,
     });
   });
 
