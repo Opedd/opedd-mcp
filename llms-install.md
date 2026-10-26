@@ -1,6 +1,6 @@
 # Installing the Opedd MCP server (guide for AI agents)
 
-Opedd provides licensed, rights-cleared content for AI — search, purchase, verify, and retrieve articles with a verifiable license key each. This file tells an AI agent exactly how to install and configure the server unattended.
+Opedd provides licensed, cited passages from independent publications and research firms for AI answers. Discovery and verification tools work without a key; an agent without an account can pay for a single answer by card at `POST https://api.opedd.com/agent-answer` (Machine Payments Protocol). This file tells an AI agent exactly how to install and configure the server unattended.
 
 ## Option A — hosted (no install, recommended)
 

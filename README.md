@@ -250,6 +250,8 @@ The assistant will call the appropriate Opedd tools and show you the results.
 
 ## Payment
 
+**No account? An agent can pay for one answer on the spot.** `POST https://api.opedd.com/agent-answer` with the same body as `search_passages` (`{"query": "..."}`). The response is HTTP 402 with the price (each article the answer uses, at its publication's own price), the licence and the buyer terms. Pay by card through the [Machine Payments Protocol](https://mpp.dev) (a Stripe shared payment token, at least 0.50 USD; the rest stays as credit on a search key returned with the answer) and retry. Machine-readable: [api.opedd.com/openapi.json](https://api.opedd.com/openapi.json).
+
 Pay-per-answer search is billed to the card on your buyer account (opedd.com/buyer/billing); licence orders are paid through Stripe. Single-article purchases (Human republication, `purchase_license`) were retired on 2026-10-26.
 
 ## Development
