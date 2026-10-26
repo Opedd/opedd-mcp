@@ -2,9 +2,9 @@
   "manifest_version": "0.2",
   "name": "opedd-mcp",
   "display_name": "Opedd — Licensed Content for AI",
-  "version": "0.12.12",
+  "version": "0.12.13",
   "description": "Content licensing for the AI era: licensed, rights-cleared content for AI agents.",
-  "long_description": "Opedd is content licensing for the AI era, between expert publishers and AI products. Agents discover, purchase, verify, and retrieve rights-cleared expert analysis with a verifiable licence for every use, a public record on Tempo, and signed compliance attestation artifacts. The alternative to unlicensed scraping for RAG, AI search, and training pipelines. 20 tools: lookup, requests for publications not yet on Opedd, pay-per-answer search, verification, publisher directory, licence orders (AI answers, AI training, client display), bulk feeds, audit ledger, compliance dossiers, and publisher-side content push.",
+  "long_description": "Opedd is content licensing for the AI era, between expert publishers and AI products. Agents discover, purchase, verify, and retrieve rights-cleared expert analysis with a verifiable licence for every use, a public record on Tempo, and signed compliance attestation artifacts. An agent without an account can pay for a single answer by card through the Machine Payments Protocol (POST https://api.opedd.com/agent-answer). The alternative to unlicensed scraping for RAG, AI search, and training pipelines. 20 tools: lookup, requests for publications not yet on Opedd, pay-per-answer search, verification, publisher directory, licence orders (AI answers, AI training, client display), bulk feeds, audit ledger, compliance dossiers, and publisher-side content push.",
   "author": {
     "name": "Opedd",
     "email": "hello@opedd.com",
