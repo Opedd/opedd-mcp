@@ -43,7 +43,7 @@ describe("tool annotations", () => {
   it("nothing that spends money or creates an order is read-only", async () => {
     const { ALL_TOOLS } = await load();
     const byName = new Map(ALL_TOOLS.map((t) => [t.name, t]));
-    for (const name of ["search_passages", "purchase_license", "place_licence_order", "push_content"]) {
+    for (const name of ["search_passages", "place_licence_order", "push_content"]) {
       expect(byName.get(name)?.annotations?.readOnlyHint, name).toBe(false);
     }
     expect(byName.get("push_content")?.annotations?.destructiveHint).toBe(true);

@@ -90,7 +90,7 @@ describe("TOOLS array with all env vars set", () => {
     expect(names).toContain("list_publisher_content");
     expect(names).toContain("push_content");
     expect(names).toContain("request_publication");
-    expect(names.length).toBe(21);
+    expect(names.length).toBe(20);
   });
 });
 

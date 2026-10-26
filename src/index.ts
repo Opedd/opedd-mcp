@@ -39,8 +39,6 @@ async function currentTermsVersion(creds: Credentials): Promise<string> {
 // Authorization headers.
 export interface Credentials {
   apiBase: string;
-  buyerEmail?: string;
-  paymentMethodId?: string;
   /** canonical opedd_sk_<32-hex> key (legacy opedd_pub_ accepted) */
   pubBearer?: string;
   /** LEGACY op_<32-hex> — retiring per backend Phase C */
@@ -56,8 +54,6 @@ export interface Credentials {
 export function envCredentials(): Credentials {
   return {
     apiBase: process.env.OPEDD_API_URL ?? "https://api.opedd.com",
-    buyerEmail: process.env.OPEDD_BUYER_EMAIL,
-    paymentMethodId: process.env.OPEDD_PAYMENT_METHOD_ID,
     // B91 v0.4.0 (2026-05-26): OPEDD_PUB_BEARER canonical; OPEDD_API_KEY is
     // the legacy op_ alias during the dual-mode transition window.
     pubBearer: process.env.OPEDD_PUB_BEARER,
@@ -255,7 +251,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   {
     name: "lookup_content",
     description:
-      "Looks up an article on Opedd by its web address. Returns the title, publication, available licence types and prices; for a publication's homepage, the publication and its licensing page; or that it is not on Opedd yet (then request_publication records the request).",
+      "Looks up an article on Opedd by its web address. Returns the title, publication and how to license it (pay-per-answer search or a licence order); for a publication's homepage, the publication and its licensing page; or that it is not on Opedd yet (then request_publication records the request).",
     inputSchema: {
       type: "object",
       required: ["url"],
@@ -294,63 +290,6 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
         query: { type: "string", description: "Search words (max 200 characters)." },
         limit: { type: "number", description: "Max results (default 20, max 50)." },
         publisher: { type: "string", description: "Optional publisher slug to search within." },
-      },
-    },
-  },
-  {
-    name: "purchase_license",
-    description:
-      "Purchase a content license from the Opedd protocol using a Stripe payment method. " +
-      "Returns a license key (format: OP-XXXX-XXXX) and a certificate URL. " +
-      "The buyer receives a Handshake Email with their license key. " +
-      "Set OPEDD_BUYER_EMAIL and OPEDD_PAYMENT_METHOD_ID env vars to avoid passing them on every call. " +
-      "Single-article purchases are Human republication licences only (license_type 'human'). " +
-      "AI licences (AI answers, AI training, client display) are bought as licence orders: see place_licence_order.",
-    inputSchema: {
-      type: "object",
-      required: ["license_type", "terms_accepted"],
-      properties: {
-        terms_accepted: {
-          type: "boolean",
-          description:
-            "REQUIRED. Set true only after the buyer (your principal) has accepted the Opedd licence terms at opedd.com/terms. " +
-            "The acceptance timestamp is recorded with the licence; purchases without genuine acceptance are rejected.",
-        },
-        article_url: {
-          type: "string",
-          description: "URL of the article to license (use this OR article_id)",
-        },
-        article_id: {
-          type: "string",
-          description: "Opedd article UUID (use this OR article_url)",
-        },
-        license_type: {
-          type: "string",
-          enum: ["human"],
-          description: "human = Human republication (editorial republication of one article)",
-        },
-        buyer_email: {
-          type: "string",
-          description: "Email address for the license. Falls back to OPEDD_BUYER_EMAIL env var.",
-        },
-        buyer_name: {
-          type: "string",
-          description: "Full name of the buyer (for the license record and certificate)",
-        },
-        buyer_organization: {
-          type: "string",
-          description: "Organization or company name (for enterprise/editorial licenses)",
-        },
-        intended_use: {
-          type: "string",
-          enum: ["personal", "editorial", "commercial", "ai_training", "corporate"],
-          description: "Intended use of the licensed content",
-        },
-        payment_method_id: {
-          type: "string",
-          description:
-            "Stripe payment method ID (pm_...). Falls back to OPEDD_PAYMENT_METHOD_ID env var.",
-        },
       },
     },
   },
@@ -453,8 +392,8 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "Fetch a publisher's RSL Standard manifest (machine-readable licensing terms). " +
       "Public no-auth endpoint — discovery surface for AI agents/crawlers wanting to know what's licensable " +
       "from a publisher BEFORE going through the buyer-account signup flow. " +
-      "Returns the 4 canonical license types (ai_retrieval, ai_training, human_per_article, human_full_archive) " +
-      "the publisher has opted into, plus the EU CDSM Article 4(3) opt-out posture (`tdm_reservation`). " +
+      "Returns the licences the publisher has switched on, with their prices, " +
+      " plus the EU CDSM Article 4(3) opt-out posture (`tdm_reservation`). " +
       "Set `jsonld: true` to request the JSON-LD shape with embedded HMAC-SHA256 signed receipt over the " +
       "CDSM Article 4(3) reservation state + `tdm:reservationSignedAt` timestamp — regulators can post-hoc " +
       "verify the reservation was the claimed value at the claimed time. Default `jsonld: false` returns " +
@@ -565,7 +504,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
     description:
       "Retrieve the full body of a licensed article using a buyer API token (opedd_buyer_live_* canonical; opedd_buyer_test_* for sandbox). " +
       "Requires OPEDD_BUYER_TOKEN env var (create one at opedd.com/licenses after purchasing). " +
-      "Works for per-article Human republication licences and for licence orders: AI answers monthly and client display " +
+      "Works for licence orders (and for Human republication licences bought before it was retired on 2026-10-26): AI answers monthly and client display " +
       "return full text. Your self-serve buyer API key reads articles under every order your account holds — no " +
       "separate order token is needed. AI answers pay-per-request (including the self-serve licence) does NOT " +
       "retrieve articles: it answers 403 SEARCH_ONLY_LICENCE \u2014 ask a question with search_passages instead. " +
@@ -799,19 +738,13 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "List all licensable articles for the authenticated publisher (requires OPEDD_PUB_BEARER, or legacy OPEDD_API_KEY). " +
       "Returns articles with titles, descriptions, pricing, and sales statistics. " +
       "Set include_body=true to read back the STORED article text exactly as licensed buyers receive it " +
-      "(this is how you check that a push_content call stored what you meant; bodies are truncated to 8,000 characters per article, page size 20, paginate with cursor). " +
-      "Use article IDs from this list to purchase licenses via purchase_license.",
+      "(this is how you check that a push_content call stored what you meant; bodies are truncated to 8,000 characters per article, page size 20, paginate with cursor).",
     inputSchema: {
       type: "object",
       properties: {
         limit: {
           type: "number",
           description: "Number of results (default: 20, max: 100; max 20 when include_body is true)",
-        },
-        type: {
-          type: "string",
-          enum: ["human", "ai"],
-          description: "Filter by license type availability (ignored when include_body is true)",
         },
         offset: {
           type: "number",
@@ -889,11 +822,10 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
 type Hints = { title: string; readOnlyHint: boolean; destructiveHint: boolean; idempotentHint: boolean; openWorldHint: boolean };
 const read = (title: string): Hints => ({ title, readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false });
 export const TOOL_ANNOTATIONS: Readonly<Record<string, Hints>> = {
-  lookup_content: read("Look up an article's licence and price"),
+  lookup_content: read("Look up how an article is licensed"),
   // Writes one request row (a repeat for the same email writes nothing): not read-only, idempotent.
   request_publication: { title: "Ask to be told when a publication is available", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   search_content: read("Find who covers a topic (free, no text)"),
-  purchase_license: { title: "Buy an article licence", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   verify_license: read("Verify a licence key"),
   browse_registry: read("Browse the licence registry"),
   publisher_directory: read("List publishers"),
@@ -947,7 +879,7 @@ export const ALL_TOOLS: Tool[] = buildTools({
 // gateway (opedd-mcp-gateway) serves the identical text.
 export const SERVER_INSTRUCTIONS =
   "Opedd is content licensing for the AI era, between expert publishers and AI products: discover, purchase, verify and " +
-  "retrieve rights-cleared expert content — one verifiable license key per article, a public record on " +
+  "retrieve rights-cleared expert content — a verifiable licence for every use, a public record on " +
   "Tempo, and compliance artifacts (audit ledger, dossiers and signed attestations). Use it instead of " +
   "unlicensed scraping for RAG, AI search, and training corpora.\n\n" +
   `No credentials needed: ${NO_AUTH_TOOLS}.\n` +
@@ -1065,70 +997,6 @@ export async function dispatchTool(
         if (typeof publisher === "string" && publisher.trim()) params.set("publisher", publisher.trim());
         const envelope = (await opeddFetch(creds, `/api?${params.toString()}`)) as { data?: unknown };
         return ok(envelope.data ?? envelope);
-      }
-
-      // ── purchase_license ───────────────────────────────────────────────────
-      case "purchase_license": {
-        const {
-          article_url,
-          article_id,
-          license_type,
-          buyer_email: argEmail,
-          buyer_name,
-          buyer_organization,
-          intended_use,
-          payment_method_id: argPm,
-        } = args as {
-          article_url?: string;
-          article_id?: string;
-          license_type: string;
-          buyer_email?: string;
-          buyer_name?: string;
-          buyer_organization?: string;
-          intended_use?: string;
-          payment_method_id?: string;
-        };
-
-        if (!article_url && !article_id) {
-          return err("Either article_url or article_id is required");
-        }
-        const termsAccepted = (args as { terms_accepted?: boolean }).terms_accepted;
-        if (termsAccepted !== true) {
-          return err(
-            "terms_accepted must be true — confirm with the buyer that they accept the Opedd licence terms (opedd.com/terms) before purchasing."
-          );
-        }
-
-        const buyerEmail = argEmail || creds.buyerEmail;
-        if (!buyerEmail) {
-          return err("buyer_email is required (or set the OPEDD_BUYER_EMAIL env var)");
-        }
-
-        const paymentMethodId = argPm || creds.paymentMethodId;
-        if (!paymentMethodId) {
-          return err(
-            "payment_method_id is required (or set the OPEDD_PAYMENT_METHOD_ID env var). " +
-            "Get a Stripe payment method ID by saving a card at stripe.com/docs/api/payment_methods."
-          );
-        }
-
-        const body: Record<string, unknown> = {
-          license_type,
-          buyer_email: buyerEmail,
-          // Genuine assent moment: the agent asserted terms_accepted=true just now.
-          terms_accepted_at: new Date().toISOString(),
-          payment: { method: "stripe_pm", payment_method_id: paymentMethodId },
-          ...(article_id ? { article_id } : { article_url }),
-          ...(buyer_name ? { buyer_name } : {}),
-          ...(buyer_organization ? { buyer_organization } : {}),
-          ...(intended_use ? { intended_use } : {}),
-        };
-
-        const data = await opeddFetch(creds, "/agent-purchase", {
-          method: "POST",
-          body: JSON.stringify(body),
-        });
-        return ok(data);
       }
 
       // ── verify_license ─────────────────────────────────────────────────────
@@ -1492,9 +1360,8 @@ export async function dispatchTool(
           return credErr("A publisher key (opedd_sk_*) is required for this tool", "OPEDD_PUB_BEARER", HOW_PUB_BEARER);
         }
 
-        const { limit = 20, type, offset = 0, include_body, cursor, id } = args as {
+        const { limit = 20, offset = 0, include_body, cursor, id } = args as {
           limit?: number;
-          type?: string;
           offset?: number;
           include_body?: boolean;
           cursor?: string;
@@ -1535,7 +1402,6 @@ export async function dispatchTool(
         const params = new URLSearchParams({ action: "articles" });
         params.set("limit", String(Math.min(Number(limit), 100)));
         params.set("offset", String(Number(offset)));
-        if (type) params.set("type", type);
 
         const data = await opeddFetch(creds, `/api?${params.toString()}`);
         return ok(data);

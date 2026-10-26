@@ -1,10 +1,10 @@
 {
   "manifest_version": "0.2",
   "name": "opedd-mcp",
-  "display_name": "Opedd \u2014 Licensed Content for AI",
-  "version": "0.12.11",
+  "display_name": "Opedd — Licensed Content for AI",
+  "version": "0.12.12",
   "description": "Content licensing for the AI era: licensed, rights-cleared content for AI agents.",
-  "long_description": "Opedd is content licensing for the AI era, between expert publishers and AI products. Agents discover, purchase, verify, and retrieve rights-cleared expert analysis with a verifiable license key per article, a public record on Tempo, and signed compliance attestation artifacts. The alternative to unlicensed scraping for RAG, AI search, and training pipelines. 21 tools: lookup, requests for publications not yet on Opedd, autonomous purchase, verification, publisher directory, licence orders (AI answers, AI training, client display), bulk feeds, audit ledger, compliance dossiers, and publisher-side content push.",
+  "long_description": "Opedd is content licensing for the AI era, between expert publishers and AI products. Agents discover, purchase, verify, and retrieve rights-cleared expert analysis with a verifiable licence for every use, a public record on Tempo, and signed compliance attestation artifacts. The alternative to unlicensed scraping for RAG, AI search, and training pipelines. 20 tools: lookup, requests for publications not yet on Opedd, pay-per-answer search, verification, publisher directory, licence orders (AI answers, AI training, client display), bulk feeds, audit ledger, compliance dossiers, and publisher-side content push.",
   "author": {
     "name": "Opedd",
     "email": "hello@opedd.com",
@@ -35,8 +35,6 @@
         "${__dirname}/dist/index.js"
       ],
       "env": {
-        "OPEDD_BUYER_EMAIL": "${user_config.buyer_email}",
-        "OPEDD_PAYMENT_METHOD_ID": "${user_config.payment_method_id}",
         "OPEDD_BUYER_TOKEN": "${user_config.buyer_token}",
         "OPEDD_ACCESS_KEY": "${user_config.access_key}",
         "OPEDD_BUYER_JWT": "${user_config.buyer_jwt}",
@@ -45,19 +43,6 @@
     }
   },
   "user_config": {
-    "buyer_email": {
-      "type": "string",
-      "title": "Buyer email",
-      "description": "Default buyer identity for purchases",
-      "required": false
-    },
-    "payment_method_id": {
-      "type": "string",
-      "title": "Stripe PaymentMethod id (pm_...)",
-      "description": "Enables autonomous per-article purchasing",
-      "sensitive": true,
-      "required": false
-    },
     "buyer_token": {
       "type": "string",
       "title": "Buyer API token (opedd_buyer_live_*)",

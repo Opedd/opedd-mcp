@@ -35,7 +35,7 @@ Then add it to your MCP host (see [Claude Desktop / Cursor / Windsurf setup](#cl
 
 ## Hosted endpoint — no install (mcp.opedd.com)
 
-Prefer zero-install? The same 21 tools are served hosted at **`https://mcp.opedd.com/mcp`** (Streamable HTTP). Auth is an `Authorization: Bearer` header with any Opedd key — public discovery tools need no auth at all.
+Prefer zero-install? The same 20 tools are served hosted at **`https://mcp.opedd.com/mcp`** (Streamable HTTP). Auth is an `Authorization: Bearer` header with any Opedd key — public discovery tools need no auth at all.
 
 **Claude Messages API** (production agents):
 
@@ -82,19 +82,18 @@ Key routing: `opedd_sk_*` (legacy `opedd_pub_*`) → publisher tools · `opedd_b
 
 ## What it does
 
-Exposes up to 21 tools to any AI assistant (some are conditional on env vars):
+Exposes up to 20 tools to any AI assistant (some are conditional on env vars):
 
 Every tool carries a `title` and MCP annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) so an assistant can tell which tools only read and which spend money or write (v0.12.0).
 
-**Always available — discovery + per-article purchase + onboarding + rights signaling**
+**Always available — discovery + onboarding + rights signaling**
 
 | Tool | Description |
 |------|-------------|
 | `search_content` | **Free discovery.** Full-text search across everything licensable (v0.8.0) — ranked matches with publisher, prices, word count and a description snippet; quotes for phrases, `-word` to exclude. Returns **no article text** — use `search_passages` to actually read |
 | `search_passages` | **Paid per answer, or included in a monthly subscription.** Ask a question, get licensed passages that answer it, with citations. Pay per answer: charged once per article the answer uses, at that publication's own price per article, each passage capped at 300 words or 25% of the article, counted cumulatively. Monthly AI answers subscriptions (v0.12.0): included, not capped, from the subscription's start. Narrow with `publishers`, `published_after`, `published_before`, `max_results` (1–10, default 5) and cap a question's cost with `max_charge_cents`. Needs a buyer key with the `search` scope. Re-asking within 24h is free |
-| `lookup_content` | Look up an article by URL — returns title, publisher, pricing, or that it is not on Opedd yet |
+| `lookup_content` | Look up an article by URL — returns title, publisher and how to license it, or that it is not on Opedd yet |
 | `request_publication` | Ask to be told when a publication Opedd does not carry yet becomes available (url + email; no key) |
-| `purchase_license` | Buy a Human republication licence for one article via Stripe — returns OP-XXXX-XXXX key. Requires `terms_accepted: true` (genuine buyer assent to opedd.com/terms; recorded with the licence) |
 | `verify_license` | Verify a license key — returns validity, article, publisher, public-record proof |
 | `browse_registry` | Browse the public Opedd registry — lists issued LICENSES (use `publisher_directory` to browse publishers themselves) |
 | `publisher_directory` | Browse the public Opedd publisher catalog — paginated publishers with article counts + pricing + sample articles (primary buyer-discovery surface for AI labs) |
@@ -160,8 +159,6 @@ Set environment variables to pre-configure the server:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `OPEDD_BUYER_EMAIL` | Recommended | Your email — used as default for all purchases |
-| `OPEDD_PAYMENT_METHOD_ID` | Recommended | Stripe `pm_...` ID — used for autonomous per-article purchasing |
 | `OPEDD_BUYER_TOKEN` | Optional | Buyer API key (`opedd_buyer_live_*`; `opedd_buyer_test_*` for sandbox) — enables `search_passages` (with the `search` scope), `get_content`, `list_feed` + `stream_feed_ndjson` (with `order_id`) |
 | `OPEDD_ACCESS_KEY` | Optional | An order's enterprise access key (`ent_*`) — alternative credential for `list_feed` + `stream_feed_ndjson` |
 | `OPEDD_BUYER_JWT` | Optional | Supabase session JWT from the buyer portal — enables `place_licence_order` + `list_licence_orders` + `get_buyer_account` + `get_audit_events` + `get_compliance_dossier` + `article_53_attestation` |
@@ -201,8 +198,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "command": "npx",
       "args": ["opedd-mcp"],
       "env": {
-        "OPEDD_BUYER_EMAIL": "you@yourcompany.com",
-        "OPEDD_PAYMENT_METHOD_ID": "pm_..."
+        "OPEDD_BUYER_TOKEN": "opedd_buyer_live_..."
       }
     }
   }
@@ -218,8 +214,7 @@ Add to your MCP settings:
   "opedd": {
     "command": "npx opedd-mcp",
     "env": {
-      "OPEDD_BUYER_EMAIL": "you@yourcompany.com",
-      "OPEDD_PAYMENT_METHOD_ID": "pm_..."
+      "OPEDD_BUYER_TOKEN": "opedd_buyer_live_..."
     }
   }
 }
@@ -231,7 +226,7 @@ Once configured, you can ask your AI assistant:
 
 > "Look up the licensing options for this article: https://theinformation.com/articles/..."
 
-> "Purchase a human republication license for that article on my behalf."
+> "What do Opedd's publications say about EU chip subsidies? Cite the passages." — uses `search_passages`
 
 > "Verify license key OP-XXXX-XXXX and tell me what it covers."
 
@@ -251,11 +246,11 @@ Once configured, you can ask your AI assistant:
 
 > "What's in my buyer account? Show me my active API keys." — uses `get_buyer_account` (requires `OPEDD_BUYER_JWT`)
 
-The assistant will call the appropriate Opedd tools, show you the results, and—if you've pre-configured a payment method—can complete a purchase autonomously.
+The assistant will call the appropriate Opedd tools and show you the results.
 
-## Payment methods
+## Payment
 
-Purchases use **Stripe** by default (via `pm_...` payment method IDs). USDC on Tempo is also supported by the Opedd API — pass `payment: { method: 'usdc', tx_hash: '0x...' }` directly to `agent-purchase` if building a custom integration.
+Pay-per-answer search is billed to the card on your buyer account (opedd.com/buyer/billing); licence orders are paid through Stripe. Single-article purchases (Human republication, `purchase_license`) were retired on 2026-10-26.
 
 ## Development
 
