@@ -16,13 +16,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const TEST_BUYER_TOKEN = "opedd_buyer_test_unit_abc";
 const TEST_BUYER_EMAIL = "unit@opedd-test.com";
-const TEST_PM_ID = "pm_test_unit";
 
 // Set the env BEFORE importing the module — fixture-mock pattern.
 beforeEach(() => {
   vi.stubEnv("OPEDD_BUYER_TOKEN", TEST_BUYER_TOKEN);
   vi.stubEnv("OPEDD_BUYER_EMAIL", TEST_BUYER_EMAIL);
-  vi.stubEnv("OPEDD_PAYMENT_METHOD_ID", TEST_PM_ID);
   vi.stubEnv("OPEDD_API_URL", "https://api.opedd.com");
 });
 
@@ -67,20 +65,20 @@ function parsePayload(result: { content: Array<{ text: string }>; isError?: bool
 // ───────────────────────────── TOOLS array shape ─────────────────────────────
 
 describe("TOOLS array (metadata)", () => {
-  it("lists all 21 tools even with no keys set (0.12.4: same list as the hosted gateway)", async () => {
+  it("lists all 20 tools even with no keys set (0.12.4: same list as the hosted gateway)", async () => {
     vi.unstubAllEnvs();
     vi.stubEnv("OPEDD_BUYER_EMAIL", TEST_BUYER_EMAIL);
     const { TOOLS } = await loadDispatcher();
     const names = TOOLS.map((t) => t.name);
     for (const n of [
-      "lookup_content", "search_content", "purchase_license", "verify_license", "browse_registry",
+      "lookup_content", "search_content", "verify_license", "browse_registry",
       "publisher_directory", "detect_platform", "rsl_get", "place_licence_order", "search_passages",
       "get_content", "list_feed", "stream_feed_ndjson", "list_licence_orders", "get_audit_events",
       "get_buyer_account", "article_53_attestation", "get_compliance_dossier", "list_publisher_content", "push_content",
       "request_publication",
     ]) expect(names).toContain(n);
     expect(names).not.toContain("purchase_enterprise_license");
-    expect(names).toHaveLength(21);
+    expect(names).toHaveLength(20);
   });
 
   it("a key-only tool called without a key says how to get one and sends nothing", async () => {
@@ -406,73 +404,21 @@ describe("dispatchTool: detect_platform", () => {
   });
 });
 
-// ───────────────────────────── purchase_license (existing) ─────────────────────────────
-
-describe("dispatchTool: purchase_license", () => {
-  it("happy path — POSTs /agent-purchase with buyer_email + payment fallback", async () => {
-    const f = mockFetchOk({ success: true, data: { license_key: "OP-1234-5678" } });
-    const { dispatchTool } = await loadDispatcher();
-    await dispatchTool("purchase_license", {
-      article_id: "art-1",
-      license_type: "human",
-      terms_accepted: true,
-    });
-    const calls = (f as ReturnType<typeof vi.fn>).mock.calls;
-    expect(calls[0][0]).toContain("/agent-purchase");
-    const opts = calls[0][1] as RequestInit;
-    const body = JSON.parse(opts.body as string);
-    // Env fallback supplies buyer_email + payment.payment_method_id
-    expect(body.buyer_email).toBe(TEST_BUYER_EMAIL);
-    expect(body.payment.payment_method_id).toBe(TEST_PM_ID);
-    expect(body.license_type).toBe("human");
-    // Fail-closed assent (2026-07-24): the tool stamps the acceptance moment.
-    expect(typeof body.terms_accepted_at).toBe("string");
-    expect(Number.isNaN(Date.parse(body.terms_accepted_at))).toBe(false);
-  });
-
-  it("rejects missing terms_accepted (fail-closed assent)", async () => {
-    mockFetchOk({});
-    const { dispatchTool } = await loadDispatcher();
-    const result = await dispatchTool("purchase_license", {
-      article_id: "art-1",
-      license_type: "human",
-    });
+// ───────────────────────────── purchase_license (retired) ─────────────────────────────
+// Human republication retired 2026-10-26: the tool is gone (the backend's
+// /agent-purchase answers 410). Archived at branch parked/human-republication.
+describe("purchase_license retired", () => {
+  it("is not offered, and the dispatcher refuses it as unknown", async () => {
+    const { TOOLS, dispatchTool } = await loadDispatcher();
+    expect(TOOLS.map((t) => t.name)).not.toContain("purchase_license");
+    const result = await dispatchTool("purchase_license", { article_id: "art-1", license_type: "human", terms_accepted: true });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain("terms_accepted");
-  });
-
-  it("rejects missing article_url AND article_id", async () => {
-    mockFetchOk({});
-    const { dispatchTool } = await loadDispatcher();
-    const result = await dispatchTool("purchase_license", { license_type: "human" });
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain("article_url or article_id");
-  });
-
-  it("rejects missing buyer_email when env not set", async () => {
-    vi.unstubAllEnvs();
-    mockFetchOk({});
-    const { dispatchTool } = await loadDispatcher();
-    const result = await dispatchTool("purchase_license", {
-      article_id: "art-1",
-      license_type: "human",
-      terms_accepted: true,
-    });
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain("buyer_email");
   });
 });
 
 // ───────────────────────────── place_licence_order ─────────────────────────────
 
 describe("dispatchTool: place_licence_order", () => {
-  it("purchase_license offers Human republication only (AI licences are licence orders)", async () => {
-    const { TOOLS } = await loadDispatcher();
-    const tool = TOOLS.find((t) => t.name === "purchase_license")!;
-    const props = (tool.inputSchema as { properties: Record<string, { enum?: string[] }> }).properties;
-    expect(props.license_type.enum).toEqual(["human"]);
-  });
-
   it("happy path — POSTs the order body with the buyer session and the current MSA label", async () => {
     vi.stubEnv("OPEDD_BUYER_JWT", "jwt.buyer.session");
     const f = vi.fn(async (url: string) =>

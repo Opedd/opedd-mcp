@@ -33,8 +33,6 @@ Requires Node.js >= 20.
       "command": "npx",
       "args": ["-y", "opedd-mcp"],
       "env": {
-        "OPEDD_BUYER_EMAIL": "<optional: buyer email for purchases>",
-        "OPEDD_PAYMENT_METHOD_ID": "<optional: Stripe pm_... for autonomous purchase>",
         "OPEDD_BUYER_TOKEN": "<optional: opedd_buyer_live_* for content retrieval>",
         "OPEDD_PUB_BEARER": "<optional: opedd_pub_* for publisher content push>"
       }

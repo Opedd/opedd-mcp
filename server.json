@@ -6,29 +6,17 @@
     "url": "https://github.com/Opedd/opedd-mcp",
     "source": "github"
   },
-  "version": "0.12.11",
+  "version": "0.12.12",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "opedd-mcp",
-      "version": "0.12.11",
+      "version": "0.12.12",
       "transport": {
         "type": "stdio"
       },
       "environmentVariables": [
-        {
-          "name": "OPEDD_BUYER_EMAIL",
-          "description": "Your email \u2014 default buyer identity for purchases",
-          "isRequired": false,
-          "isSecret": false
-        },
-        {
-          "name": "OPEDD_PAYMENT_METHOD_ID",
-          "description": "Stripe PaymentMethod id (pm_...) for autonomous per-article purchasing",
-          "isRequired": false,
-          "isSecret": true
-        },
         {
           "name": "OPEDD_BUYER_TOKEN",
           "description": "Buyer API token (opedd_buyer_live_*) \u2014 enables licensed content retrieval",
