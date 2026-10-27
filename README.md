@@ -78,7 +78,7 @@ Prefer zero-install? The same 20 tools are served hosted at **`https://mcp.opedd
 }
 ```
 
-Key routing: `opedd_sk_*` (legacy `opedd_pub_*`) → publisher tools · `opedd_buyer_*` → content retrieval · `ent_*` → bulk feeds · buyer-portal JWT → audit/compliance/EU-AI-Act tools. Your key is forwarded per request and never stored by the gateway.
+Key routing: `opedd_sk_*` (legacy `opedd_pub_*`) → publisher tools · `opedd_buyer_*` → content retrieval · `ent_*` → bulk feeds · buyer-portal JWT → audit/compliance tools. Your key is forwarded per request and never stored by the gateway.
 
 ## What it does
 
@@ -271,11 +271,11 @@ npm run build # compiles to dist/
 | **What you get** | Licensed content + license key + public-record proof — all in one API call | Scraped web content, no rights |
 | **Content delivery** | Full article text via API (JSON) — bulk on flat-fee licenses, per-call (metered) on filtered licenses; real-time feed via webhooks | Scraped snippets or full-page dumps |
 | **Content quality** | Curated publisher content (niche B2B newsletters, expert analysis) | Whatever's on the open web |
-| **Rights** | Verifiable license key per article, publisher-authorized | No rights clearance |
+| **Rights** | Verifiable licence for every use, publisher-authorized | No rights clearance |
 | **Proof** | Public record (Tempo) — independently verifiable | None |
 | **Compliance** | Signed attestation + full provenance chain | No provenance |
-| **Pricing** | Publisher sets their own price per article | Platform decides |
-| **Delivery modes** | Per-article API, bulk feed (JSON firehose), buyer webhooks (push) | Query-response only |
+| **Pricing** | Publisher sets their own prices | Platform decides |
+| **Delivery modes** | Article API, bulk feed (JSON firehose), buyer webhooks (push) | Query-response only |
 | **Protocol** | REST + MCP native | REST only |
 
 Opedd is the **licensed content delivery layer** for AI — not just a licensing wrapper. Publishers upload content, you retrieve it via API with a license attached. One integration gives your pipeline both the content and the legal right to use it.
