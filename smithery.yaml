@@ -13,7 +13,7 @@ startCommand:
         description: Enterprise access key (ent_*) — enables bulk feed tools
       opeddBuyerJwt:
         type: string
-        description: Buyer portal session JWT — account/audit/compliance/EU-AI-Act tools
+        description: Buyer portal session JWT — account/audit/compliance tools
       opeddPubBearer:
         type: string
         description: Publisher API key (opedd_pub_*) — publisher push tools
