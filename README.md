@@ -234,7 +234,7 @@ Once configured, you can ask your AI assistant:
 
 ### Phase 12 Wave 1 + 3 surfaces (v0.3.0)
 
-> "What does publisher 8268c353-ffa3-4db3-bbb2-90ddbbb43e41 license? Pull the RSL manifest." — uses `rsl_get`
+> "What does Geopolitical Dispatch license? Pull the RSL manifest." — uses `publisher_directory` to find it, then `rsl_get`
 
 > "Get me a CDSM Article 4(3) signed receipt for that publisher's reservation state — set `jsonld: true`." — uses `rsl_get` with content negotiation
 
