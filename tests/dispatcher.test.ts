@@ -297,9 +297,9 @@ describe("dispatchTool: browse_registry", () => {
   it("publisher_id filter flows through to query", async () => {
     const f = mockFetchOk({ success: true, data: {} });
     const { dispatchTool } = await loadDispatcher();
-    await dispatchTool("browse_registry", { publisher_id: "8268c353" });
+    await dispatchTool("browse_registry", { publisher_id: "11111111" });
     const call = String((f as ReturnType<typeof vi.fn>).mock.calls[0][0]);
-    expect(call).toContain("publisher_id=8268c353");
+    expect(call).toContain("publisher_id=11111111");
   });
 });
 
@@ -339,7 +339,7 @@ describe("dispatchTool: rsl_get", () => {
     const f = mockFetchOk({ rsl_version: "1.0", tdm_reservation: true });
     const { dispatchTool } = await loadDispatcher();
     await dispatchTool("rsl_get", {
-      publisher_id: "8268c353-ffa3-4db3-bbb2-90ddbbb43e41",
+      publisher_id: "11111111-2222-4333-8444-555555555555",
     });
     const calls = (f as ReturnType<typeof vi.fn>).mock.calls;
     expect(calls[0][0]).toContain("/rsl-manifest?publisher_id=");
@@ -351,7 +351,7 @@ describe("dispatchTool: rsl_get", () => {
     const f = mockFetchOk({ "@type": "opedd:CdsmArticle4Reservation" });
     const { dispatchTool } = await loadDispatcher();
     await dispatchTool("rsl_get", {
-      publisher_id: "8268c353-ffa3-4db3-bbb2-90ddbbb43e41",
+      publisher_id: "11111111-2222-4333-8444-555555555555",
       jsonld: true,
     });
     const calls = (f as ReturnType<typeof vi.fn>).mock.calls;
