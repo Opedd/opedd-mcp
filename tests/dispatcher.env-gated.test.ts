@@ -1,7 +1,7 @@
-// Env-gated tool tests — covers the 7 tools that register conditionally
-// based on env-var presence:
+// Env-gated tool tests — covers the 6 tools that register conditionally
+// based on env-var presence (article_53_attestation was removed 2026-11-03):
 //
-//   article_53_attestation, get_buyer_account, get_audit_events,
+//   get_buyer_account, get_audit_events,
 //   get_compliance_dossier  (require OPEDD_BUYER_JWT)
 //   list_feed, stream_feed_ndjson  (require OPEDD_ACCESS_KEY)
 //   list_publisher_content  (requires OPEDD_PUB_BEARER OR legacy OPEDD_API_KEY)
@@ -68,7 +68,7 @@ function mockFetchNdjson(lines: unknown[]): ReturnType<typeof vi.fn> {
 // ───────────────────────────── all env-gated tools register ─────────────────────────────
 
 describe("TOOLS array with all env vars set", () => {
-  it("exposes the 10 env-gated tools alongside the always-available", async () => {
+  it("exposes the 9 env-gated tools alongside the always-available", async () => {
     const { TOOLS } = await loadDispatcher();
     const names = TOOLS.map((t) => t.name);
     // BUYER_TOKEN-gated
@@ -79,7 +79,7 @@ describe("TOOLS array with all env vars set", () => {
     expect(names).toContain("search_passages");
     // BUYER_JWT-gated
     expect(names).toContain("get_buyer_account");
-    expect(names).toContain("article_53_attestation");
+    expect(names).not.toContain("article_53_attestation");
     expect(names).toContain("get_audit_events");
     expect(names).toContain("get_compliance_dossier");
     expect(names).toContain("list_licence_orders");
@@ -90,7 +90,7 @@ describe("TOOLS array with all env vars set", () => {
     expect(names).toContain("list_publisher_content");
     expect(names).toContain("push_content");
     expect(names).toContain("request_publication");
-    expect(names.length).toBe(20);
+    expect(names.length).toBe(19);
   });
 });
 
@@ -119,53 +119,6 @@ describe("dispatchTool: get_buyer_account (BUYER_JWT gated, chip 13)", () => {
     expect(String(call[0])).toContain("/buyer-account");
     const headers = (call[1] as RequestInit).headers as Record<string, string>;
     expect(headers["Authorization"]).toBe(`Bearer ${TEST_BUYER_JWT}`);
-  });
-});
-
-describe("dispatchTool: article_53_attestation (BUYER_JWT gated, chip 2)", () => {
-  it("happy path — license_id only", async () => {
-    const f = mockFetchOk({
-      success: true,
-      data: { jwt: "eyJ.test.sig", claims: { eu_ai_act_article: 53, aud: "eu-ai-act-article-53" } },
-    });
-    const { dispatchTool } = await loadDispatcher();
-    await dispatchTool("article_53_attestation", {
-      license_id: "11111111-2222-3333-4444-555555555555",
-    });
-    const call = f.mock.calls[0];
-    // DASH-separated function name end to end — the api.opedd.com proxy
-    // rewrites the path verbatim, so the pre-2026-07-10 slashed shape
-    // ("/eu-ai-act/article-53-attestation") routed to a nonexistent
-    // function and 404'd in production. This fixture asserted the broken
-    // URL for 6+ weeks — a guard poured around the wrong value. Any
-    // change to this path MUST be live-probed against api.opedd.com.
-    expect(String(call[0])).toContain(
-      "/eu-ai-act-article-53-attestation?license_id=11111111-2222-3333-4444-555555555555",
-    );
-  });
-
-  it("with all optional params (content_id + window_start + window_end)", async () => {
-    const f = mockFetchOk({ success: true, data: {} });
-    const { dispatchTool } = await loadDispatcher();
-    await dispatchTool("article_53_attestation", {
-      license_id: "11111111-2222-3333-4444-555555555555",
-      content_id: "22222222-3333-4444-5555-666666666666",
-      window_start: "2026-02-22T00:00:00Z",
-      window_end: "2026-05-22T00:00:00Z",
-    });
-    const call = String(f.mock.calls[0][0]);
-    expect(call).toContain("/eu-ai-act-article-53-attestation?");
-    expect(call).toContain("content_id=22222222");
-    expect(call).toContain("window_start=2026-02-22T00%3A00%3A00Z");
-    expect(call).toContain("window_end=2026-05-22T00%3A00%3A00Z");
-  });
-
-  it("rejects missing license_id", async () => {
-    mockFetchOk({});
-    const { dispatchTool } = await loadDispatcher();
-    const result = await dispatchTool("article_53_attestation", {});
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain("license_id is required");
   });
 });
 

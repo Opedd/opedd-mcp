@@ -31,7 +31,7 @@ function mockFetchOk(body: unknown) {
 describe("tool annotations", () => {
   it("every advertised tool has a title and both directory hints", async () => {
     const { ALL_TOOLS } = await load();
-    expect(ALL_TOOLS.length).toBeGreaterThanOrEqual(20);
+    expect(ALL_TOOLS.length).toBeGreaterThanOrEqual(19);
     for (const t of ALL_TOOLS) {
       expect(t.title, t.name).toBeTruthy();
       expect(typeof t.annotations?.readOnlyHint, t.name).toBe("boolean");
