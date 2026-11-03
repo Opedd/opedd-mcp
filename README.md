@@ -135,9 +135,7 @@ Every tool carries a `title` and MCP annotations (`readOnlyHint`, `destructiveHi
 Per Opedd's platform invariants (W1.6 amendment):
 
 - **`rsl_get(publisher_id, jsonld=true)`** → publisher-side **CDSM Article 4(3)** opt-out declaration (signed JSON-LD receipt over the reservation state).
-- **`get_compliance_dossier(from, to)`** → comprehensive procurement-defense dossier covering BOTH sides (publisher CDSM reservation honored + buyer attestation evidence chain).
-
-These serve different audit-defensibility modes and never share wire format. Tool descriptions cite the W1.6 invariant inline.
+- **`get_compliance_dossier(from, to)`** → procurement-defense dossier: every licensed retrieval in a window, with its licence terms, the publisher's CDSM reservation status and public-record proof.
 
 ## Install
 
