@@ -47,7 +47,7 @@ export interface Credentials {
   buyerToken?: string;
   /** enterprise access key (ent_*) — /enterprise-license GET feed */
   accessKey?: string;
-  /** Supabase JWT — buyer-audit + compliance + attestation surfaces */
+  /** Supabase JWT — buyer-audit + compliance surfaces */
   buyerJwt?: string;
 }
 
@@ -398,8 +398,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "CDSM Article 4(3) reservation state + `tdm:reservationSignedAt` timestamp — regulators can post-hoc " +
       "verify the reservation was the claimed value at the claimed time. Default `jsonld: false` returns " +
       "the raw RSL Standard JSON manifest. " +
-      "This is the publisher's own declaration. It is not a compliance attestation for a buyer " +
-      "(use article_53_attestation for that).",
+      "This is the publisher's own declaration, not a record of a buyer's use (use get_compliance_dossier for that).",
     inputSchema: {
       type: "object",
       required: ["publisher_id"],
@@ -672,43 +671,9 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
     },
   });
   TOOLS.push({
-    name: "article_53_attestation",
-    description:
-      "Issue a signed compliance attestation (a JWT) for a licence you hold. " +
-      "Returns a freshly-signed HS256 JWT regulators can verify offline against the canonical signing key. " +
-      "Embeds: license context, usage-count over the attestation window, the most-recent Tempo Merkle root, " +
-      "and canonical claims (iss/sub/iat/exp/jti/aud). " +
-      "**The artifact a buyer hands to legal/procurement as evidence of where its content came from.** " +
-      "It attests how your licence was used; the publisher's own licensing declaration is rsl_get. " +
-      "Optional `content_id` scopes the attestation to one article; default is license-wide. " +
-      "Window cap: 365 days. Auth: an audit-scoped buyer API key (OPEDD_BUYER_TOKEN) or OPEDD_BUYER_JWT.",
-    inputSchema: {
-      type: "object",
-      required: ["license_id"],
-      properties: {
-        license_id: {
-          type: "string",
-          description: "UUID of the enterprise_license OR legacy individual license to attest. Buyer must own it.",
-        },
-        content_id: {
-          type: "string",
-          description: "Optional UUID of a specific article to scope the attestation. Default: license-wide.",
-        },
-        window_start: {
-          type: "string",
-          description: "ISO 8601 lower bound of the attestation window. Default: now - 90 days.",
-        },
-        window_end: {
-          type: "string",
-          description: "ISO 8601 upper bound. Default: now. Window may not exceed 365 days (hard cap).",
-        },
-      },
-    },
-  });
-  TOOLS.push({
     name: "get_compliance_dossier",
     description:
-      "Returns the account's compliance dossier for a period: one row per licensed article, with article metadata, licence terms, public-record attestation and compliance flags (the signed attestation, CDSM Article 4(3) and text-and-data-mining reservations). At most 90 days per call; longer periods are paginated with _meta.next_cursor. Each call is recorded in the account's audit log. Requires a buyer API key with the 'audit' scope, a buyer session, or the Opedd connector sign-in.",
+      "Returns the account's compliance dossier for a period: one row per licensed article, with article metadata, licence terms, public-record attestation and compliance flags (CDSM Article 4(3) and text-and-data-mining reservations). At most 90 days per call; longer periods are paginated with _meta.next_cursor. Each call is recorded in the account's audit log. Requires a buyer API key with the 'audit' scope, a buyer session, or the Opedd connector sign-in.",
     inputSchema: {
       type: "object",
       required: ["from", "to"],
@@ -840,7 +805,6 @@ export const TOOL_ANNOTATIONS: Readonly<Record<string, Hints>> = {
   list_licence_orders: read("List your licence orders"),
   get_audit_events: read("Read your audit log"),
   get_buyer_account: read("Read your buyer account"),
-  article_53_attestation: read("Get a signed compliance attestation"),
   get_compliance_dossier: read("Get your compliance dossier"),
   list_publisher_content: read("List your published articles"),
   // Upserts the publisher's own articles; an upsert can overwrite.
@@ -880,7 +844,7 @@ export const ALL_TOOLS: Tool[] = buildTools({
 export const SERVER_INSTRUCTIONS =
   "Opedd is content licensing for the AI era, between expert publishers and AI products: discover, purchase, verify and " +
   "retrieve rights-cleared expert content — a verifiable licence for every use, a public record on " +
-  "Tempo, and compliance artifacts (audit ledger, dossiers and signed attestations). Use it instead of " +
+  "Tempo, and compliance artifacts (audit ledger and dossiers). Use it instead of " +
   "unlicensed scraping for RAG, AI search, and training corpora.\n\n" +
   `No credentials needed: ${NO_AUTH_TOOLS}.\n` +
   "Buyer tools (purchase, account, audit/compliance): free buyer signup at https://opedd.com/buyer/signup " +
@@ -1296,37 +1260,6 @@ export async function dispatchTool(
         const data = await opeddFetch(creds, "/buyer-account", {
           headers: { Authorization: `Bearer ${creds.buyerJwt}` },
         });
-        return ok(data);
-      }
-
-      // ── article_53_attestation (Phase 12 Wave 1 W1.4) ──────────────────────
-      case "article_53_attestation": {
-        if (!auditCred(creds)) {
-          return credErr("Buyer credentials are required for this tool", "OPEDD_BUYER_TOKEN (audit-scoped key) or OPEDD_BUYER_JWT", HOW_AUDIT_CRED);
-        }
-        const { license_id, content_id, window_start, window_end } = args as {
-          license_id: string;
-          content_id?: string;
-          window_start?: string;
-          window_end?: string;
-        };
-        if (!license_id) return err("license_id is required");
-
-        const params = new URLSearchParams({ license_id });
-        if (content_id) params.set("content_id", content_id);
-        if (window_start) params.set("window_start", window_start);
-        if (window_end) params.set("window_end", window_end);
-
-        // Function name is DASH-separated end to end: the api.opedd.com proxy
-        // rewrites /:path* verbatim into /functions/v1/:path*, so the prior
-        // slashed "/eu-ai-act/article-53-attestation" resolved to a
-        // nonexistent function named "eu-ai-act" and 404'd — this tool had
-        // NEVER worked in production until the 2026-07-10 fix (live-probed).
-        const data = await opeddFetch(
-          creds,
-          `/eu-ai-act-article-53-attestation?${params.toString()}`,
-          { headers: { Authorization: `Bearer ${auditCred(creds)}` } },
-        );
         return ok(data);
       }
 

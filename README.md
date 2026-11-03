@@ -35,7 +35,7 @@ Then add it to your MCP host (see [Claude Desktop / Cursor / Windsurf setup](#cl
 
 ## Hosted endpoint — no install (mcp.opedd.com)
 
-Prefer zero-install? The same 20 tools are served hosted at **`https://mcp.opedd.com/mcp`** (Streamable HTTP). Auth is an `Authorization: Bearer` header with any Opedd key — public discovery tools need no auth at all.
+Prefer zero-install? The same 19 tools are served hosted at **`https://mcp.opedd.com/mcp`** (Streamable HTTP). Auth is an `Authorization: Bearer` header with any Opedd key — public discovery tools need no auth at all.
 
 **Claude Messages API** (production agents):
 
@@ -82,7 +82,7 @@ Key routing: `opedd_sk_*` (legacy `opedd_pub_*`) → publisher tools · `opedd_b
 
 ## What it does
 
-Exposes up to 20 tools to any AI assistant (some are conditional on env vars):
+Exposes up to 19 tools to any AI assistant (some are conditional on env vars):
 
 Every tool carries a `title` and MCP annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) so an assistant can tell which tools only read and which spend money or write (v0.12.0).
 
@@ -114,7 +114,7 @@ Every tool carries a `title` and MCP annotations (`readOnlyHint`, `destructiveHi
 | `list_feed` | List the articles a licence order covers, with `since` delta-feed support. AI training and Full catalogue orders carry full `content_body` (`content_access: "included"`); monthly orders are discovery-only (`content_access: "retrieval_per_article"`, fetch text via `get_content`); per-request orders are `"search_only"`. With a buyer key, pass `order_id` (optional when the account holds one active order) |
 | `stream_feed_ndjson` | Bulk-export up to 1000 articles per call via NDJSON wire format. Same content contract and credentials as `list_feed` |
 
-**Requires `OPEDD_BUYER_JWT` (Supabase JWT) — buyer account + audit + compliance + attestation surfaces**
+**Requires `OPEDD_BUYER_JWT` (Supabase JWT) — buyer account + audit + compliance surfaces**
 
 | Tool | Description |
 |------|-------------|
@@ -122,7 +122,6 @@ Every tool carries a `title` and MCP annotations (`readOnlyHint`, `destructiveHi
 | `list_licence_orders` | The buyer's licence orders and lines; with `order_id`, each line's Schedule document and its SHA-256 (the fingerprint recorded on Tempo). Also works with an audit-scoped `OPEDD_BUYER_TOKEN` |
 | `get_audit_events` | Per-event audit ledger with public-record (Tempo) inclusion proofs inline (Phase 9.x + 10 M5) |
 | `get_compliance_dossier` | Procurement-defense compliance dossier mapping retrievals to license terms (Phase 11 M4) |
-| `article_53_attestation` | Signed compliance attestation (JWT) for a license — the artifact a buyer hands to legal/procurement (Phase 12 W1.4) |
 
 **Requires `OPEDD_PUB_BEARER` (opedd_sk_*; legacy opedd_pub_* still works) — publisher-side**
 
@@ -136,7 +135,6 @@ Every tool carries a `title` and MCP annotations (`readOnlyHint`, `destructiveHi
 Per Opedd's platform invariants (W1.6 amendment):
 
 - **`rsl_get(publisher_id, jsonld=true)`** → publisher-side **CDSM Article 4(3)** opt-out declaration (signed JSON-LD receipt over the reservation state).
-- **`article_53_attestation(license_id)`** → buyer-side **signed compliance attestation** (HS256 JWT scoped to one license).
 - **`get_compliance_dossier(from, to)`** → comprehensive procurement-defense dossier covering BOTH sides (publisher CDSM reservation honored + buyer attestation evidence chain).
 
 These serve different audit-defensibility modes and never share wire format. Tool descriptions cite the W1.6 invariant inline.
@@ -161,7 +159,7 @@ Set environment variables to pre-configure the server:
 |----------|----------|-------------|
 | `OPEDD_BUYER_TOKEN` | Optional | Buyer API key (`opedd_buyer_live_*`; `opedd_buyer_test_*` for sandbox) — enables `search_passages` (with the `search` scope), `get_content`, `list_feed` + `stream_feed_ndjson` (with `order_id`) |
 | `OPEDD_ACCESS_KEY` | Optional | An order's enterprise access key (`ent_*`) — alternative credential for `list_feed` + `stream_feed_ndjson` |
-| `OPEDD_BUYER_JWT` | Optional | Supabase session JWT from the buyer portal — enables `place_licence_order` + `list_licence_orders` + `get_buyer_account` + `get_audit_events` + `get_compliance_dossier` + `article_53_attestation` |
+| `OPEDD_BUYER_JWT` | Optional | Supabase session JWT from the buyer portal — enables `place_licence_order` + `list_licence_orders` + `get_buyer_account` + `get_audit_events` + `get_compliance_dossier` |
 | `OPEDD_PUB_BEARER` | Optional | Publisher API key (`opedd_sk_<32-hex>`, canonical since 2026-08-27; older `opedd_pub_<32-hex>` keys keep working) — from the Opedd dashboard, Settings → Developers. Enables `list_publisher_content` (+ `include_body`) and `push_content`. |
 | `OPEDD_API_KEY` | Deprecated | Legacy Publisher API key (`op_...`) — fallback during the transition window; will stop working when opedd-backend Phase C deploys. Migrate to `OPEDD_PUB_BEARER`. |
 | `OPEDD_API_URL` | Optional | Override the API base URL (default: Opedd production) |
@@ -238,8 +236,6 @@ Once configured, you can ask your AI assistant:
 
 > "Get me a CDSM Article 4(3) signed receipt for that publisher's reservation state — set `jsonld: true`." — uses `rsl_get` with content negotiation
 
-> "Generate a signed compliance attestation for our license `11111111-...` covering the last 90 days. I need the artifact for our procurement audit committee." — uses `article_53_attestation` (requires `OPEDD_BUYER_JWT`)
-
 > "This publisher just signed up: `https://noahpinion.substack.com`. Which onboarding workflow should we use?" — uses `detect_platform`
 
 > "Browse the finance category in the Opedd catalog — show me publishers with at least 50 articles." — uses `publisher_directory`
@@ -273,7 +269,7 @@ npm run build # compiles to dist/
 | **Content quality** | Curated publisher content (niche B2B newsletters, expert analysis) | Whatever's on the open web |
 | **Rights** | Verifiable licence for every use, publisher-authorized | No rights clearance |
 | **Proof** | Public record (Tempo) — independently verifiable | None |
-| **Compliance** | Signed attestation + full provenance chain | No provenance |
+| **Compliance** | Audit log, compliance dossier and full provenance chain | No provenance |
 | **Pricing** | Publisher sets their own prices | Platform decides |
 | **Delivery modes** | Article API, bulk feed (JSON firehose), buyer webhooks (push) | Query-response only |
 | **Protocol** | REST + MCP native | REST only |

@@ -6,13 +6,13 @@
     "url": "https://github.com/Opedd/opedd-mcp",
     "source": "github"
   },
-  "version": "0.12.14",
+  "version": "0.12.15",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "opedd-mcp",
-      "version": "0.12.14",
+      "version": "0.12.15",
       "transport": {
         "type": "stdio"
       },
@@ -31,7 +31,7 @@
         },
         {
           "name": "OPEDD_BUYER_JWT",
-          "description": "Buyer portal session JWT \u2014 enables account, audit, compliance and attestation tools",
+          "description": "Buyer portal session JWT \u2014 enables account, audit and compliance tools",
           "isRequired": false,
           "isSecret": true
         },

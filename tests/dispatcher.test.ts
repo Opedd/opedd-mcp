@@ -8,7 +8,7 @@
 // JSON-stringified ToolResult shape, (c) error mapping for non-2xx.
 //
 // Covers the 8 always-available tools (no env-var gate required). The 7
-// env-gated tools (article_53_attestation, get_buyer_account, list_feed,
+// env-gated tools (get_buyer_account, list_feed,
 // stream_feed_ndjson, get_audit_events, get_compliance_dossier,
 // list_publisher_content) are covered in dispatcher.env-gated.test.ts.
 
@@ -74,11 +74,12 @@ describe("TOOLS array (metadata)", () => {
       "lookup_content", "search_content", "verify_license", "browse_registry",
       "publisher_directory", "detect_platform", "rsl_get", "place_licence_order", "search_passages",
       "get_content", "list_feed", "stream_feed_ndjson", "list_licence_orders", "get_audit_events",
-      "get_buyer_account", "article_53_attestation", "get_compliance_dossier", "list_publisher_content", "push_content",
+      "get_buyer_account", "get_compliance_dossier", "list_publisher_content", "push_content",
       "request_publication",
     ]) expect(names).toContain(n);
     expect(names).not.toContain("purchase_enterprise_license");
-    expect(names).toHaveLength(20);
+    expect(names).not.toContain("article_53_attestation");
+    expect(names).toHaveLength(19);
   });
 
   it("a key-only tool called without a key says how to get one and sends nothing", async () => {
@@ -96,8 +97,6 @@ describe("TOOLS array (metadata)", () => {
   it("every tool carries name + description + inputSchema", async () => {
     const { TOOLS } = await loadDispatcher();
     for (const tool of TOOLS) {
-      // digits allowed since article_53_attestation became visible with a
-      // buyer token alone (0.6.15 scoped-keys visibility widening)
       expect(tool.name).toMatch(/^[a-z0-9_]+$/);
       expect(typeof tool.description).toBe("string");
       expect(tool.description.length).toBeGreaterThan(20);
