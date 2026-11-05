@@ -242,7 +242,7 @@ const HOW_ACCESS_KEY =
   "Enterprise access keys (ent_*) are delivered when an enterprise licence is issued — start at https://opedd.com/enterprise " +
   "or place a licence order with the place_licence_order tool.";
 const HOW_PUB_BEARER =
-  "Publisher keys (opedd_sk_*, legacy opedd_pub_* still valid) come from the publisher dashboard: sign up free at https://opedd.com, then Settings → API keys.";
+  "Publisher keys (opedd_sk_*, legacy opedd_pub_* still valid) come from the publisher dashboard: sign up free at https://opedd.com, then Settings → For developers.";
 
 // ─── Tool definitions ─────────────────────────────────────────────────────────
 
@@ -266,7 +266,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   {
     name: "request_publication",
     description:
-      "Asks Opedd to tell you when a publication it does not carry yet becomes available to license. Use it after lookup_content says an article is not on Opedd. Records the request against the email given; nothing is bought. If the publication is already on Opedd, returns its licensing page instead. Free; no key needed.",
+      "Asks Opedd to tell you when a publication it does not carry yet becomes available to license. For an article that lookup_content reports is not on Opedd. Records the request against the email given; nothing is bought. If the publication is already on Opedd, returns its licensing page instead. Free; no key needed.",
     inputSchema: {
       type: "object",
       required: ["url", "email"],
@@ -398,7 +398,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "CDSM Article 4(3) reservation state + `tdm:reservationSignedAt` timestamp — regulators can post-hoc " +
       "verify the reservation was the claimed value at the claimed time. Default `jsonld: false` returns " +
       "the raw RSL Standard JSON manifest. " +
-      "This is the publisher's own declaration, not a record of a buyer's use (use get_compliance_dossier for that).",
+      "This is the publisher's own declaration, not a record of a buyer's use (get_compliance_dossier records that).",
     inputSchema: {
       type: "object",
       required: ["publisher_id"],
@@ -511,7 +511,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "The publisher must have content delivery enabled and must have pushed content for the article. " +
       "The response includes author, language, word_count, content_hash, image_urls, canonical_url and tags. " +
       "On pre-2026-05-14 historical articles, optional fields (author/language/image_urls/canonical_url/tags) may be NULL. " +
-      "NULL means 'data unavailable for this article', NOT 'explicitly empty' — treat as data-missing when filtering; do not interpret as anti-match.",
+      "NULL means the data is unavailable for this article, not that it is empty.",
     inputSchema: {
       type: "object",
       required: ["article_id"],
@@ -546,7 +546,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "Credentials: the order's enterprise access key (OPEDD_ACCESS_KEY, ent_*) OR your buyer API key " +
       "(OPEDD_BUYER_TOKEN) with order_id — if your account holds exactly one active order, order_id may be omitted; " +
       "with several, the error lists them. " +
-      "For larger bulk corpus pulls, use stream_feed_ndjson (up to 1000 articles per call vs 200 here).",
+      "stream_feed_ndjson returns up to 1000 articles per call (200 here).",
     inputSchema: {
       type: "object",
       properties: {
@@ -575,11 +575,11 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "Bulk-export the articles in a licence order you hold. " +
       "Returns up to 1000 articles per call (collected from line-delimited JSON wire format). " +
       "Same content contract as list_feed: full text for AI training orders only; every other order exports " +
-      "metadata (content_body null) — use get_content for article text. " +
+      "metadata (content_body null); get_content returns article text. " +
       "Each exported article is recorded for analytics; a bulk export is not billed per article. " +
-      "Use `since` (ISO 8601) for delta-feed. Use `cursor` to paginate beyond 1000. " +
+      "`since` (ISO 8601) returns a delta feed; `cursor` pages beyond 1000. " +
       "Backend supports 5000 articles per call; the MCP cap is 1000 for transport reasonability. " +
-      "Real bulk-ingest pipelines should use the Python SDK (pip install opedd) directly — not via MCP. " +
+      "For bulk-ingest pipelines, the Python SDK (pip install opedd) reads the same feed without the MCP cap. " +
       "Credentials as list_feed: OPEDD_ACCESS_KEY (ent_*) OR your buyer API key + order_id.",
     inputSchema: {
       type: "object",
@@ -738,7 +738,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
     description:
       "Push your published articles to Opedd so they can be licensed to AI buyers (requires OPEDD_PUB_BEARER — your opedd_sk_ publisher key). " +
       "Send 1–100 articles per call; batch larger back-catalogues into multiple calls. Each article needs title, url, and html_body — everything else is optional (published_at defaults to now). " +
-      "This is the supply-side companion to list_publisher_content: use it to onboard your archive or push new content with no code, straight from your AI assistant.",
+      "This is the supply-side companion to list_publisher_content: it sends a back catalogue or new articles with no code, from an AI assistant.",
     inputSchema: {
       type: "object",
       required: ["articles"],
@@ -842,14 +842,14 @@ export const ALL_TOOLS: Tool[] = buildTools({
 // registry metadata agents never see at runtime. Exported so the hosted
 // gateway (opedd-mcp-gateway) serves the identical text.
 export const SERVER_INSTRUCTIONS =
-  "Opedd is content licensing for the AI era, between expert publishers and AI products: discover, purchase, verify and " +
+  "Opedd is content licensing for the AI era, between expert publishers and AI products: discover, license, verify and " +
   "retrieve rights-cleared expert content — a verifiable licence for every use, a public record on " +
-  "Tempo, and compliance artifacts (audit ledger and dossiers). Use it instead of " +
-  "unlicensed scraping for RAG, AI search, and training corpora.\n\n" +
+  "Tempo, and compliance artifacts (audit ledger and dossiers). A licensed alternative to " +
+  "unlicensed scraping for RAG, AI search and training corpora.\n\n" +
   `No credentials needed: ${NO_AUTH_TOOLS}.\n` +
-  "Buyer tools (purchase, account, audit/compliance): free buyer signup at https://opedd.com/buyer/signup " +
+  "Buyer tools (licence orders, account, audit/compliance): free buyer signup at https://opedd.com/buyer/signup " +
   "(~2 min; an API key is issued instantly). Publisher tools (content push): free publisher signup at " +
-  "https://opedd.com, key under Settings → API keys.\n" +
+  "https://opedd.com, key under Settings → For developers.\n" +
   "Supply credentials as env vars (local/stdio) or an Authorization: Bearer header (hosted gateway, " +
   "https://mcp.opedd.com/mcp).\n" +
   "EU CDSM Art. 4(3) / TDM-reservation queries: rsl_get. Compliance evidence: get_compliance_dossier. " +
