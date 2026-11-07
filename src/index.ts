@@ -251,7 +251,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   {
     name: "lookup_content",
     description:
-      "Looks up an article on Opedd by its web address. Returns the title, publication and how to license it (pay-per-answer search or a licence order); for a publication's homepage, the publication and its licensing page; or that it is not on Opedd yet (then request_publication records the request).",
+      "Looks up an article on Opedd by its web address. Returns the title, publication and how to license it (pay-per-answer search or a licence order); for a publication's homepage, the publication and its licensing page; for a publication that licenses directly, that it is available on request; or that it is not on Opedd yet (then request_publication records the request).",
     inputSchema: {
       type: "object",
       required: ["url"],
@@ -266,7 +266,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   {
     name: "request_publication",
     description:
-      "Asks Opedd to tell you when a publication it does not carry yet becomes available to license. For an article that lookup_content reports is not on Opedd. Records the request against the email given; nothing is bought. If the publication is already on Opedd, returns its licensing page instead. Free; no key needed.",
+      "Asks Opedd to tell you when a publication it does not carry yet becomes available to license. For an article that lookup_content reports is not on Opedd. Records the request against the email given; nothing is bought. If the publication is already on Opedd, returns its licensing page instead; if it is listed as available on request, the request is passed to its publisher. Free; no key needed.",
     inputSchema: {
       type: "object",
       required: ["url", "email"],
@@ -334,7 +334,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   {
     name: "publisher_directory",
     description:
-      "Lists the publications on Opedd with their article counts, licences, prices and sample articles. Filters: category (case-insensitive substring), min_articles and verified status. Public; no key needed.",
+      "Lists the publications on Opedd with their article counts, licences, prices and sample articles. Publications that license directly and are listed as available on request come separately, in on_request (first page only). Filters: category (case-insensitive substring), min_articles and verified status. Public; no key needed.",
     inputSchema: {
       type: "object",
       properties: {
@@ -913,7 +913,20 @@ export async function dispatchTool(
             // Opedd (its homepage, or a piece not imported yet): say so, and
             // where to license it (2026-10-24). Agents that looked up a
             // publication's homepage were told it was not on Opedd.
-            const details = (e as { details?: { on_opedd?: boolean; publication?: { name?: string; licensing_page?: string } } }).details;
+            const details = (e as { details?: { on_opedd?: boolean; available_on_request?: boolean; publication?: { name?: string; licensing_page?: string } } }).details;
+            // Listed as available on request (2026-11-07): the publication
+            // licenses directly; a request is passed to it by name.
+            if (details?.available_on_request === true && details.publication) {
+              return ok({
+                on_opedd: false,
+                available_on_request: true,
+                url,
+                publication: details.publication,
+                message:
+                  `${details.publication.name ?? "This publication"} licenses its work directly and is listed on Opedd as available on request. ` +
+                  "Nothing of it is sold or delivered through Opedd. request_publication, with this url and an email, sends a request that Opedd passes to the publisher.",
+              });
+            }
             if (details?.on_opedd === true && details.publication) {
               return ok({
                 on_opedd: true,

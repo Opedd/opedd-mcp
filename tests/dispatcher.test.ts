@@ -198,6 +198,30 @@ describe("dispatchTool: lookup_content", () => {
     expect(String(payload.message)).not.toContain("request_publication");
   });
 
+  it("a publication listed as available on request: says so, names no sale, and how to ask (2026-11-07)", async () => {
+    mockFetchErr({
+      success: false,
+      error: {
+        code: "NOT_FOUND",
+        message: "No article at this address on Opedd.",
+        details: {
+          on_opedd: false,
+          available_on_request: true,
+          publication: { name: "The Harbour Review", availability: "on_request", licensing_page: "https://opedd.com/p/harbour-review" },
+        },
+      },
+    }, 404);
+    const { dispatchTool } = await loadDispatcher();
+    const result = await dispatchTool("lookup_content", { url: "https://harbourreview.org/x" });
+    expect(result.isError).toBeUndefined();
+    const payload = parsePayload(result);
+    expect(payload).toMatchObject({ on_opedd: false, available_on_request: true });
+    expect(String(payload.message)).toContain("The Harbour Review licenses its work directly");
+    expect(String(payload.message)).toContain("Nothing of it is sold or delivered through Opedd");
+    expect(String(payload.message)).toContain("request_publication");
+    expect(String(payload.message).toLowerCase()).not.toContain("coming soon");
+  });
+
   it("other failures stay errors", async () => {
     mockFetchErr({ success: false, error: { code: "INTERNAL", message: "Lookup failed" } }, 500);
     const { dispatchTool } = await loadDispatcher();
