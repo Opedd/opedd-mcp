@@ -456,10 +456,9 @@ describe("dispatchTool: place_licence_order", () => {
     globalThis.fetch = f as unknown as typeof fetch;
     const { dispatchTool } = await loadDispatcher();
     const result = await dispatchTool("place_licence_order", {
-      licence: "display",
+      licence: "enterprise",
       billing_mode: "monthly",
       publisher_ids: ["pub-1", "pub-2"],
-      quantity: 3,
       terms_accepted: true,
     });
     expect(result.isError).toBeFalsy();
@@ -471,7 +470,8 @@ describe("dispatchTool: place_licence_order", () => {
     expect(init.method).toBe("POST");
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer jwt.buyer.session");
     const body = JSON.parse(init.body as string);
-    expect(body).toMatchObject({ licence: "display", billing_mode: "monthly", publisher_ids: ["pub-1", "pub-2"], quantity: 3 });
+    expect(body).toMatchObject({ licence: "enterprise", billing_mode: "monthly", publisher_ids: ["pub-1", "pub-2"] });
+    expect(body).not.toHaveProperty("quantity");
     expect(body.terms_version).toBe("buyer-master-agreement-v5.4");
     expect(body).not.toHaveProperty("buyer_email");
   });
@@ -493,7 +493,7 @@ describe("dispatchTool: place_licence_order", () => {
   });
 });
 
-describe("dispatchTool: place_licence_order — Full catalogue", () => {
+describe("dispatchTool: place_licence_order — the three licences (2026-11-12)", () => {
   function mockOrderFetch() {
     const f = vi.fn(async (url: string) =>
       new Response(
@@ -509,60 +509,42 @@ describe("dispatchTool: place_licence_order — Full catalogue", () => {
   }
   const orderBody = (f: ReturnType<typeof vi.fn>) => JSON.parse((f.mock.calls[1][1] as RequestInit).body as string);
 
-  it("schema offers licence 'archive' and an optional include_archive boolean", async () => {
+  it("schema offers only AI answers and Full download + training, with no bundle or client count", async () => {
     const { TOOLS } = await loadDispatcher();
     const tool = TOOLS.find((t) => t.name === "place_licence_order")!;
     const schema = tool.inputSchema as { required: string[]; properties: Record<string, { enum?: string[]; type?: string }> };
-    expect(schema.properties.licence.enum).toEqual(["enterprise", "archive", "training", "display"]);
-    expect(schema.properties.include_archive.type).toBe("boolean");
-    expect(schema.required).not.toContain("include_archive");
-    expect(tool.description).toContain("Full catalogue");
+    expect(schema.properties.licence.enum).toEqual(["enterprise", "training"]);
+    expect(schema.properties).not.toHaveProperty("include_archive");
+    expect(schema.properties).not.toHaveProperty("quantity");
+    expect(tool.description).toContain("Full download + training");
+    expect(tool.description).toContain("whole catalogue");
+    expect(tool.description).not.toMatch(/Full catalogue|client display/i);
   });
 
-  it("orders the Full catalogue one-off", async () => {
+  it("orders Full download + training one-off, and sends nothing it no longer knows", async () => {
     vi.stubEnv("OPEDD_BUYER_JWT", "jwt.buyer.session");
     const f = mockOrderFetch();
     const { dispatchTool } = await loadDispatcher();
     const result = await dispatchTool("place_licence_order", {
-      licence: "archive", billing_mode: "one_time", publisher_ids: ["pub-1"], terms_accepted: true,
+      licence: "training", billing_mode: "one_time", publisher_ids: ["pub-1"], terms_accepted: true,
+      include_archive: true, quantity: 3,
     });
     expect(result.isError).toBeFalsy();
-    const body = orderBody(f);
-    expect(body).toEqual({ licence: "archive", billing_mode: "one_time", publisher_ids: ["pub-1"], terms_version: "buyer-master-agreement-v5.4" });
+    expect(orderBody(f)).toEqual({ licence: "training", billing_mode: "one_time", publisher_ids: ["pub-1"], terms_version: "buyer-master-agreement-v5.4" });
   });
+});
 
-  it("sends include_archive with a monthly AI answers order, and omits it when not set", async () => {
-    vi.stubEnv("OPEDD_BUYER_JWT", "jwt.buyer.session");
-    let f = mockOrderFetch();
+describe("dispatchTool: get_content — publication scope", () => {
+  it("passes publisher_id through when given, and omits it otherwise", async () => {
+    vi.stubEnv("OPEDD_BUYER_TOKEN", "opedd_buyer_live_" + "a".repeat(32));
+    let f = mockFetchOk({ article_id: "a1" });
     let { dispatchTool } = await loadDispatcher();
-    await dispatchTool("place_licence_order", {
-      licence: "enterprise", billing_mode: "monthly", publisher_ids: ["pub-1"], include_archive: true, terms_accepted: true,
-    });
-    expect(orderBody(f).include_archive).toBe(true);
-
-    f = mockOrderFetch();
+    await dispatchTool("get_content", { article_id: "a1", publisher_id: "pub-9" });
+    expect(String((f as ReturnType<typeof vi.fn>).mock.calls[0][0])).toBe("https://api.opedd.com/content-delivery?article_id=a1&publisher_id=pub-9");
+    f = mockFetchOk({ article_id: "a1" });
     ({ dispatchTool } = await loadDispatcher());
-    await dispatchTool("place_licence_order", {
-      licence: "enterprise", billing_mode: "monthly", publisher_ids: ["pub-1"], include_archive: false, terms_accepted: true,
-    });
-    expect(orderBody(f)).not.toHaveProperty("include_archive");
-  });
-
-  it.each([
-    ["enterprise", "metered"],
-    ["archive", "one_time"],
-    ["training", "one_time"],
-    ["display", "monthly"],
-  ])("refuses include_archive with %s + %s and calls nothing", async (licence, billing_mode) => {
-    vi.stubEnv("OPEDD_BUYER_JWT", "jwt.buyer.session");
-    const f = mockFetchOk({});
-    const { dispatchTool } = await loadDispatcher();
-    const result = await dispatchTool("place_licence_order", {
-      licence, billing_mode, publisher_ids: ["pub-1"], include_archive: true, terms_accepted: true,
-    });
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain("include_archive applies only to a monthly AI answers licence");
-    expect((f as ReturnType<typeof vi.fn>).mock.calls.length).toBe(0);
+    await dispatchTool("get_content", { article_id: "a1" });
+    expect(String((f as ReturnType<typeof vi.fn>).mock.calls[0][0])).toBe("https://api.opedd.com/content-delivery?article_id=a1");
   });
 });
 

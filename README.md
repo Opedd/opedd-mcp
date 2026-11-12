@@ -97,7 +97,7 @@ Every tool carries a `title` and MCP annotations (`readOnlyHint`, `destructiveHi
 | `verify_license` | Verify a license key — returns validity, article, publisher, public-record proof |
 | `browse_registry` | Browse the public Opedd registry — lists issued LICENSES (use `publisher_directory` to browse publishers themselves) |
 | `publisher_directory` | Browse the public Opedd publisher catalog — paginated publishers with article counts + pricing + sample articles (primary buyer-discovery surface for AI labs) |
-| `place_licence_order` | Place a licence order for one or more publishers: AI answers (`monthly` full text, or `metered` pay-per-request snippets ≤300 words / 25%), Full catalogue (`archive`, `one_time`: everything published up to the order date, kept permanently, no AI training), AI training (`one_time`, back catalogue), client display (`monthly` × end clients). Optional `include_archive: true` on a monthly AI answers order adds each publisher's Full catalogue for complete access. Each publisher is its own Schedule at its own price; returns the order, lines, `unavailable` publishers and `hosted_invoice_url`. Needs `OPEDD_BUYER_JWT` and `terms_accepted: true` |
+| `place_licence_order` | Place a licence order for one or more publishers: AI answers (`monthly`: a subscription to the publisher's whole catalogue while it is paid, under a daily reading limit; or `metered`: pay per answer, snippets ≤300 words / 25%), or Full download + training (`training`, `one_time`: a full copy of the back catalogue with the right to train on it; the only bulk copy). Each publisher is its own Schedule at its own price; returns the order, lines, `unavailable` publishers and `hosted_invoice_url`. Needs `OPEDD_BUYER_JWT` and `terms_accepted: true` |
 | `rsl_get` | Fetch a publisher's RSL Standard manifest — public discovery surface; `jsonld: true` returns CDSM Article 4(3) signed receipt (Phase 12 W1.1) |
 | `detect_platform` | Detect the content platform behind a URL — returns suggested onboarding workflow for Substack / Beehiiv / Ghost / Medium / Brevo / custom (Phase 12 W3.1) |
 
@@ -105,13 +105,13 @@ Every tool carries a `title` and MCP annotations (`readOnlyHint`, `destructiveHi
 
 | Tool | Description |
 |------|-------------|
-| `get_content` | Retrieve a licensed article under any order your account holds — full text for AI answers monthly and client display orders; pay-per-request licences read through `search_passages` (403 `SEARCH_ONLY_LICENCE`); includes 7 RAG metadata fields (author, language, word_count, content_hash, image_urls, canonical_url, tags) |
+| `get_content` | Retrieve a licensed article under any order your account holds, or a subscription your company holds for your work email — full text of any article in the catalogue under an AI answers subscription, counted against a daily reading limit (429 `DAILY_READING_LIMIT` with the reset time); pay-per-request licences read through `search_passages` (403 `SEARCH_ONLY_LICENCE`); optional `publisher_id` restricts it to one publication; includes 7 RAG metadata fields (author, language, word_count, content_hash, image_urls, canonical_url, tags) |
 
 **Feed tools — `OPEDD_BUYER_TOKEN` + `order_id`, or an order's `OPEDD_ACCESS_KEY` (ent_*)**
 
 | Tool | Description |
 |------|-------------|
-| `list_feed` | List the articles a licence order covers, with `since` delta-feed support. AI training and Full catalogue orders carry full `content_body` (`content_access: "included"`); monthly orders are discovery-only (`content_access: "retrieval_per_article"`, fetch text via `get_content`); per-request orders are `"search_only"`. With a buyer key, pass `order_id` (optional when the account holds one active order) |
+| `list_feed` | List the articles a licence order covers, with `since` delta-feed support. Full download + training orders carry full `content_body` (`content_access: "included"`); subscriptions list the whole catalogue, discovery-only (`content_access: "retrieval_per_article"`, fetch text via `get_content`); per-request orders are `"search_only"`. With a buyer key, pass `order_id` (optional when the account holds one active order) |
 | `stream_feed_ndjson` | Bulk-export up to 1000 articles per call via NDJSON wire format. Same content contract and credentials as `list_feed` |
 
 **Requires `OPEDD_BUYER_JWT` (Supabase JWT) — buyer account + audit + compliance surfaces**
