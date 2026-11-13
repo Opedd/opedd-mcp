@@ -216,7 +216,8 @@ describe("dispatchTool: lookup_content", () => {
     expect(result.isError).toBeUndefined();
     const payload = parsePayload(result);
     expect(payload).toMatchObject({ on_opedd: false, available_on_request: true });
-    expect(String(payload.message)).toContain("The Harbour Review licenses its work directly");
+    expect(String(payload.message)).toContain("The Harbour Review is available on request through Opedd");
+    expect(String(payload.message)).not.toMatch(/directly/);
     expect(String(payload.message)).toContain("Nothing of it is sold or delivered through Opedd");
     expect(String(payload.message)).toContain("request_publication");
     expect(String(payload.message).toLowerCase()).not.toContain("coming soon");
