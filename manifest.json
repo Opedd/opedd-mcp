@@ -2,9 +2,9 @@
   "manifest_version": "0.2",
   "name": "opedd-mcp",
   "display_name": "Opedd — Licensed Content for AI",
-  "version": "0.12.15",
+  "version": "0.12.20",
   "description": "Content licensing for the AI era: licensed, rights-cleared content for AI agents.",
-  "long_description": "Opedd is content licensing for the AI era, between expert publishers and AI products. Agents discover, purchase, verify, and retrieve rights-cleared expert analysis with a verifiable licence for every use, a public record on Tempo, and compliance records (audit log and dossiers). An agent without an account can pay for a single answer by card through the Machine Payments Protocol (POST https://api.opedd.com/agent-answer). The alternative to unlicensed scraping for RAG, AI search, and training pipelines. 19 tools: lookup, requests for publications not yet on Opedd, pay-per-answer search, verification, publisher directory, licence orders (AI answers by subscription or per answer, Full download + training), bulk feeds, audit ledger, compliance dossiers, and publisher-side content push.",
+  "long_description": "Opedd is content licensing for the AI era, between expert publishers and AI products. Agents discover, ask, verify and read rights-cleared expert analysis with a verifiable licence for every use, a public record on Tempo, and compliance records (audit log and dossiers). An agent without an account can pay for a single answer by card through the Machine Payments Protocol (POST https://api.opedd.com/agent-answer). The alternative to unlicensed scraping for RAG, AI search, and training pipelines. 19 tools: lookup, requests for publications not yet on Opedd, pay-per-answer search, verification, publisher directory, licence orders (AI answers by subscription or per answer, Full download + training), bulk feeds, audit ledger, compliance dossiers, and publisher-side content push.",
   "author": {
     "name": "Opedd",
     "email": "hello@opedd.com",
@@ -45,28 +45,28 @@
     "buyer_token": {
       "type": "string",
       "title": "Buyer API token (opedd_buyer_live_*)",
-      "description": "Enables licensed content retrieval",
+      "description": "Questions, articles, the feed and audit tools (opedd_buyer_live_*)",
       "sensitive": true,
       "required": false
     },
     "access_key": {
       "type": "string",
       "title": "Enterprise access key (ent_*)",
-      "description": "Enables bulk feed tools (list_feed, stream_feed_ndjson)",
+      "description": "An order's access key (ent_*): the feed tools (list_feed, stream_feed_ndjson)",
       "sensitive": true,
       "required": false
     },
     "buyer_jwt": {
       "type": "string",
       "title": "Buyer portal session JWT",
-      "description": "Enables account, audit and compliance tools",
+      "description": "Buyer portal session token: orders, the account and audit tools",
       "sensitive": true,
       "required": false
     },
     "pub_bearer": {
       "type": "string",
       "title": "Publisher API key (opedd_sk_*)",
-      "description": "Enables publisher content push tools",
+      "description": "Publisher API key (opedd_sk_*): publisher listing and push tools",
       "sensitive": true,
       "required": false
     }

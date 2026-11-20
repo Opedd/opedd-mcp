@@ -5,7 +5,7 @@
 <h1 align="center">opedd-mcp</h1>
 
 <p align="center">
-  <strong>Licensed, rights-cleared content for AI agents</strong> — the alternative to unlicensed scraping for RAG, AI search, and LLM grounding.
+  <strong>Licensed, rights-cleared content for AI agents</strong>: the alternative to unlicensed scraping for RAG, AI search and LLM grounding.
 </p>
 
 <p align="center">
@@ -21,23 +21,25 @@
   <a href="https://opedd.com/for-ai-agents?utm_source=github&utm_medium=readme&utm_campaign=mcp"><img src="https://img.shields.io/badge/Docs-opedd.com-111" alt="Docs"></a>
 </p>
 
-Lets AI assistants (Claude Desktop, Cursor, Windsurf, or any MCP-compatible host) discover, purchase, and verify content licenses autonomously — mid-conversation, without opening a browser. Every license is recorded in a public registry on Tempo, with cryptographic proof.
+Lets AI assistants (Claude, ChatGPT, Cursor, Windsurf, or any MCP host) find licensed publications, ask them questions, read and verify licensed content, mid-conversation. Every licence is recorded in a public registry on Tempo.
 
-**Unlike generic search APIs**, Opedd returns content with a verifiable license key — with the rights cleared and a record you can show your legal team.
+**Unlike generic search APIs**, every answer comes from a publisher who licensed it, with a citation and a record you can show your legal team.
 
 ## Quick start
 
 ```bash
-npx opedd-mcp
+npx -y opedd-mcp
 ```
 
-Then add it to your MCP host (see [Claude Desktop / Cursor / Windsurf setup](#claude-desktop-setup) below). Discovery + verification tools work with no configuration; purchasing and content retrieval use optional API keys from [opedd.com](https://opedd.com?utm_source=github&utm_medium=readme&utm_campaign=mcp).
+Then add it to your MCP host ([setup below](#claude-desktop-setup)). Discovery tools work with no key. Questions, articles and orders use a buyer key: sign up at [opedd.com/buyer/signup](https://opedd.com/buyer/signup?utm_source=github&utm_medium=readme&utm_campaign=mcp). New accounts get their first 3 answers free.
 
-## Hosted endpoint — no install (mcp.opedd.com)
+## Hosted, no install (mcp.opedd.com)
 
-Prefer zero-install? The same 19 tools are served hosted at **`https://mcp.opedd.com/mcp`** (Streamable HTTP). Auth is an `Authorization: Bearer` header with any Opedd key — public discovery tools need no auth at all.
+**Claude, ChatGPT and other connector apps:** add the custom connector `https://mcp.opedd.com` and sign in with your work email. No key to copy. Each publication also has its own address, `https://<publication>.mcp.opedd.com`, limited to that publication.
 
-**Claude Messages API** (production agents):
+**APIs and agents:** use `https://mcp.opedd.com/mcp` (Streamable HTTP) with your key in an `Authorization: Bearer` header. Without a key it lists the 16 public and buyer tools; the publisher tools appear with a publisher key.
+
+**Claude Messages API:**
 
 ```json
 {
@@ -50,7 +52,7 @@ Prefer zero-install? The same 19 tools are served hosted at **`https://mcp.opedd
 }
 ```
 
-**OpenAI Responses API**:
+**OpenAI Responses API:**
 
 ```json
 {
@@ -62,8 +64,6 @@ Prefer zero-install? The same 19 tools are served hosted at **`https://mcp.opedd
   }]
 }
 ```
-
-**claude.ai / Claude Desktop custom connector** (all plans): Settings → Connectors → *Add custom connector* → URL `https://mcp.opedd.com/mcp`; add a `Authorization: Bearer <your key>` request header for the credentialed tools.
 
 **Cursor** (`.cursor/mcp.json`):
 
@@ -78,110 +78,70 @@ Prefer zero-install? The same 19 tools are served hosted at **`https://mcp.opedd
 }
 ```
 
-Key routing: `opedd_sk_*` (legacy `opedd_pub_*`) → publisher tools · `opedd_buyer_*` → content retrieval · `ent_*` → bulk feeds · buyer-portal JWT → audit/compliance tools. Your key is forwarded per request and never stored by the gateway.
+Key routing: `opedd_buyer_*` covers questions, articles, the feed and audit tools · `ent_*` an order's feed · a buyer-portal session token covers orders and the account · `opedd_sk_*` (older `opedd_pub_*`) the publisher tools. Your key is forwarded per request and never stored.
 
-## What it does
+## Tools
 
-Exposes up to 19 tools to any AI assistant (some are conditional on env vars):
+19 tools. Run locally, all 19 are listed; a tool that needs a key you have not set says which key and where to get it. Every tool carries a `title` and MCP annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`).
 
-Every tool carries a `title` and MCP annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) so an assistant can tell which tools only read and which spend money or write (v0.12.0).
+**No key needed**
 
-**Always available — discovery + onboarding + rights signaling**
-
-| Tool | Description |
+| Tool | What it does |
 |------|-------------|
-| `search_content` | **Free discovery.** Full-text search across everything licensable (v0.8.0) — ranked matches with publisher, prices, word count and a description snippet; quotes for phrases, `-word` to exclude. Returns **no article text** — use `search_passages` to actually read |
-| `search_passages` | **Paid per answer, or included in a monthly subscription.** Ask a question, get licensed passages that answer it, with citations. Pay per answer: charged once per article the answer uses, at that publication's own price per article, each passage capped at 300 words or 25% of the article, counted cumulatively. Monthly AI answers subscriptions (v0.12.0): included, not capped, from the subscription's start. Narrow with `publishers`, `published_after`, `published_before`, `max_results` (1–10, default 5) and cap a question's cost with `max_charge_cents`. Needs a buyer key with the `search` scope. Re-asking within 24h is free |
-| `lookup_content` | Look up an article by URL — returns title, publisher and how to license it, or that it is not on Opedd yet |
-| `request_publication` | Ask to be told when a publication Opedd does not carry yet becomes available (url + email; no key) |
-| `verify_license` | Verify a license key — returns validity, article, publisher, public-record proof |
-| `browse_registry` | Browse the public Opedd registry — lists issued LICENSES (use `publisher_directory` to browse publishers themselves) |
-| `publisher_directory` | Browse the public Opedd publisher catalog — paginated publishers with article counts + pricing + sample articles (primary buyer-discovery surface for AI labs) |
-| `place_licence_order` | Place a licence order for one or more publishers: AI answers (`monthly`: a subscription to the publisher's whole catalogue while it is paid, under a daily reading limit; or `metered`: pay per answer, snippets ≤300 words / 25%), or Full download + training (`training`, `one_time`: a full copy of the back catalogue with the right to train on it; the only bulk copy). Each publisher is its own Schedule at its own price; returns the order, lines, `unavailable` publishers and `hosted_invoice_url`. Needs `OPEDD_BUYER_JWT` and `terms_accepted: true` |
-| `rsl_get` | Fetch a publisher's RSL Standard manifest — public discovery surface; `jsonld: true` returns CDSM Article 4(3) signed receipt (Phase 12 W1.1) |
-| `detect_platform` | Detect the content platform behind a URL — returns suggested onboarding workflow for Substack / Beehiiv / Ghost / Medium / Brevo / custom (Phase 12 W3.1) |
+| `search_content` | Free search across everything licensable: matching articles with publication, price, word count and a short description. No article text |
+| `lookup_content` | Look up an article by URL: how it is licensed, or that it is not on Opedd yet |
+| `publisher_directory` | Browse publications on Opedd, with article counts, prices and samples, plus publications available on request |
+| `request_publication` | Ask for a publication Opedd does not carry yet (url and email) |
+| `verify_license` | Check a licence key (`OP-XXXX-XXXX-XXXX-XXXX`): validity, coverage and public-record proof |
+| `browse_registry` | Browse issued licences in the public registry |
+| `rsl_get` | A publisher's RSL licensing manifest; `jsonld: true` returns its signed CDSM Article 4(3) opt-out receipt |
+| `detect_platform` | Detect the platform behind a publication URL and suggest how to onboard it |
 
-**Requires `OPEDD_BUYER_TOKEN` (opedd_buyer_live_*) — one key covers search, articles and the feed (v0.12.0)**
+**Buyer key (`OPEDD_BUYER_TOKEN`)**
 
-| Tool | Description |
+| Tool | What it does |
 |------|-------------|
-| `get_content` | Retrieve a licensed article under any order your account holds, or a subscription your company holds for your work email — full text of any article in the catalogue under an AI answers subscription, counted against a daily reading limit (429 `DAILY_READING_LIMIT` with the reset time); pay-per-request licences read through `search_passages` (403 `SEARCH_ONLY_LICENCE`); optional `publisher_id` restricts it to one publication; includes 7 RAG metadata fields (author, language, word_count, content_hash, image_urls, canonical_url, tags) |
+| `search_passages` | Ask a question, get licensed passages that answer it, with citations. Charged per article the answer uses at that publication's price, or included in a monthly subscription. Passages are capped at 300 words or 25% of an article; the same question within 24 hours is free. Filters: `publishers`, `published_after`, `published_before`, `max_results` (1 to 10, default 5), `max_charge_cents`. Needs the `search` scope |
+| `get_content` | Read a full article under a monthly subscription (20 articles per person and 200 per order a day; over that, 429 `DAILY_READING_LIMIT`). Pay per answer is search only (403 `SEARCH_ONLY_LICENCE`) |
+| `list_feed` | The articles an order covers, with `since` for new ones. Full download + training orders include the text; subscriptions list the catalogue and read through `get_content` |
+| `stream_feed_ndjson` | The same feed in bulk, up to 1,000 articles per call (NDJSON) |
 
-**Feed tools — `OPEDD_BUYER_TOKEN` + `order_id`, or an order's `OPEDD_ACCESS_KEY` (ent_*)**
+The feed tools also accept an order's access key (`OPEDD_ACCESS_KEY`, `ent_*`).
 
-| Tool | Description |
+**Buyer account (`OPEDD_BUYER_JWT`, from the buyer portal)**
+
+| Tool | What it does |
 |------|-------------|
-| `list_feed` | List the articles a licence order covers, with `since` delta-feed support. Full download + training orders carry full `content_body` (`content_access: "included"`); subscriptions list the whole catalogue, discovery-only (`content_access: "retrieval_per_article"`, fetch text via `get_content`); per-request orders are `"search_only"`. With a buyer key, pass `order_id` (optional when the account holds one active order) |
-| `stream_feed_ndjson` | Bulk-export up to 1000 articles per call via NDJSON wire format. Same content contract and credentials as `list_feed` |
+| `place_licence_order` | Order a licence for one or more publications: AI answers (monthly subscription, or pay per answer) or Full download + training (one-off). Returns the order and its invoice link. Needs `terms_accepted: true` |
+| `get_buyer_account` | Your buyer profile and masked API keys |
+| `list_licence_orders` | Your orders and lines; with `order_id`, each line's Schedule and its fingerprint on Tempo |
+| `get_audit_events` | Every licensed use, with public-record proof |
+| `get_compliance_dossier` | A procurement-ready record of licensed use in a date range |
 
-**Requires `OPEDD_BUYER_JWT` (Supabase JWT) — buyer account + audit + compliance surfaces**
+The last three also work with an audit-scoped buyer key.
 
-| Tool | Description |
+**Publisher key (`OPEDD_PUB_BEARER`)**
+
+| Tool | What it does |
 |------|-------------|
-| `get_buyer_account` | Fetch buyer profile + masked API key list — buyer-dashboard mental model |
-| `list_licence_orders` | The buyer's licence orders and lines; with `order_id`, each line's Schedule document and its SHA-256 (the fingerprint recorded on Tempo). Also works with an audit-scoped `OPEDD_BUYER_TOKEN` |
-| `get_audit_events` | Per-event audit ledger with public-record (Tempo) inclusion proofs inline (Phase 9.x + 10 M5) |
-| `get_compliance_dossier` | Procurement-defense compliance dossier mapping retrievals to license terms (Phase 11 M4) |
-
-**Requires `OPEDD_PUB_BEARER` (opedd_sk_*; legacy opedd_pub_* still works) — publisher-side**
-
-| Tool | Description |
-|------|-------------|
-| `list_publisher_content` | List your own articles with pricing and stats |
-| `push_content` | Push your articles to Opedd so AI buyers can license them — 1–100 per call (`title`/`url`/`html_body` required, everything else optional). Onboard your back-catalogue or new posts with no code, straight from your AI assistant. |
-
-### Compliance artifacts (publisher-side vs buyer-side — never conflated)
-
-Per Opedd's platform invariants (W1.6 amendment):
-
-- **`rsl_get(publisher_id, jsonld=true)`** → publisher-side **CDSM Article 4(3)** opt-out declaration (signed JSON-LD receipt over the reservation state).
-- **`get_compliance_dossier(from, to)`** → procurement-defense dossier: every licensed retrieval in a window, with its licence terms, the publisher's CDSM reservation status and public-record proof.
-
-## Install
-
-```bash
-npm install -g opedd-mcp
-```
-
-Or run directly with npx:
-
-```bash
-npx opedd-mcp
-```
+| `list_publisher_content` | Your articles, with prices and stats |
+| `push_content` | Send articles to Opedd, 1 to 100 per call (`title`, `url`, `html_body` required) |
 
 ## Configuration
 
-Set environment variables to pre-configure the server:
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `OPEDD_BUYER_TOKEN` | Optional | Buyer API key (`opedd_buyer_live_*`; `opedd_buyer_test_*` for sandbox) — enables `search_passages` (with the `search` scope), `get_content`, `list_feed` + `stream_feed_ndjson` (with `order_id`) |
-| `OPEDD_ACCESS_KEY` | Optional | An order's enterprise access key (`ent_*`) — alternative credential for `list_feed` + `stream_feed_ndjson` |
-| `OPEDD_BUYER_JWT` | Optional | Supabase session JWT from the buyer portal — enables `place_licence_order` + `list_licence_orders` + `get_buyer_account` + `get_audit_events` + `get_compliance_dossier` |
-| `OPEDD_PUB_BEARER` | Optional | Publisher API key (`opedd_sk_<32-hex>`, canonical since 2026-08-27; older `opedd_pub_<32-hex>` keys keep working) — from the Opedd dashboard, Settings → Developers. Enables `list_publisher_content` (+ `include_body`) and `push_content`. |
-| `OPEDD_API_KEY` | Deprecated | Legacy Publisher API key (`op_...`) — fallback during the transition window; will stop working when opedd-backend Phase C deploys. Migrate to `OPEDD_PUB_BEARER`. |
-| `OPEDD_API_URL` | Optional | Override the API base URL (default: Opedd production) |
-| `OPEDD_MCP_TELEMETRY` | Optional | Set to `0` to disable anonymous usage telemetry (see below) |
-
-> **Getting a Stripe payment method ID**: Save a card in your Stripe account and retrieve the `pm_...` ID via the [Stripe API](https://stripe.com/docs/api/payment_methods).
+| Variable | Description |
+|----------|-------------|
+| `OPEDD_BUYER_TOKEN` | Buyer API key (`opedd_buyer_live_*`; `opedd_buyer_test_*` for sandbox), from [opedd.com/buyer/signup](https://opedd.com/buyer/signup), under Account, API keys. Questions, articles, the feed and (audit scope) the audit tools |
+| `OPEDD_ACCESS_KEY` | An order's access key (`ent_*`), for the feed tools |
+| `OPEDD_BUYER_JWT` | Buyer-portal session token, for orders, the account and audit tools |
+| `OPEDD_PUB_BEARER` | Publisher API key (`opedd_sk_*`; older `opedd_pub_*` keys still work), from the Opedd dashboard, Settings, For developers |
+| `OPEDD_API_KEY` | Deprecated legacy publisher key (`op_*`). Use `OPEDD_PUB_BEARER` |
+| `OPEDD_API_URL` | Override the API base URL (default: Opedd production) |
+| `OPEDD_MCP_TELEMETRY` | Set to `0` to turn off anonymous usage telemetry |
 
 ## Anonymous usage telemetry
 
-To understand how AI assistants use this server, `opedd-mcp` sends anonymous
-telemetry for each tool call: **only the tool name, its duration, whether it
-succeeded, and the server version** — plus a random per-process id. It never
-sends tool parameters, responses, your email, API keys, tokens, content, or
-your IP. Data goes to Opedd's PostHog (EU region).
-
-**To opt out**, set either environment variable before starting the server:
-
-```
-OPEDD_MCP_TELEMETRY=0
-# or the cross-tool standard:
-DO_NOT_TRACK=1
-```
-
-When opted out, no telemetry client is created and nothing is sent.
+For each tool call `opedd-mcp` sends only the tool name, its duration, whether it succeeded and the server version, with a random per-process id. Never parameters, responses, emails, keys, content or your IP. Data goes to Opedd's PostHog (EU). To opt out, set `OPEDD_MCP_TELEMETRY=0` or `DO_NOT_TRACK=1`; nothing is then sent.
 
 ## Claude Desktop setup
 
@@ -192,10 +152,8 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "opedd": {
       "command": "npx",
-      "args": ["opedd-mcp"],
-      "env": {
-        "OPEDD_BUYER_TOKEN": "opedd_buyer_live_..."
-      }
+      "args": ["-y", "opedd-mcp"],
+      "env": { "OPEDD_BUYER_TOKEN": "opedd_buyer_live_..." }
     }
   }
 }
@@ -203,50 +161,34 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ## Cursor / Windsurf setup
 
-Add to your MCP settings:
-
 ```json
 {
-  "opedd": {
-    "command": "npx opedd-mcp",
-    "env": {
-      "OPEDD_BUYER_TOKEN": "opedd_buyer_live_..."
+  "mcpServers": {
+    "opedd": {
+      "command": "npx",
+      "args": ["-y", "opedd-mcp"],
+      "env": { "OPEDD_BUYER_TOKEN": "opedd_buyer_live_..." }
     }
   }
 }
 ```
 
-## Example usage
+## Example prompts
 
-Once configured, you can ask your AI assistant:
+> "What do Opedd's publications say about EU chip subsidies? Cite the passages." uses `search_passages`
 
-> "Look up the licensing options for this article: https://theinformation.com/articles/..."
+> "Is this article licensable? https://www.worldpoliticsreview.com/..." uses `lookup_content`
 
-> "What do Opedd's publications say about EU chip subsidies? Cite the passages." — uses `search_passages`
+> "Verify licence key OP-XXXX-XXXX-XXXX-XXXX and tell me what it covers." uses `verify_license`
 
-> "Verify license key OP-XXXX-XXXX and tell me what it covers."
+> "Show me geopolitics publications on Opedd with at least 50 articles." uses `publisher_directory`
 
-> "Browse the latest licenses from The Information publisher."
+> "Get Geopolitical Dispatch's RSL manifest and its signed opt-out receipt." uses `rsl_get`
 
-### Phase 12 Wave 1 + 3 surfaces (v0.3.0)
+## Paying
 
-> "What does Geopolitical Dispatch license? Pull the RSL manifest." — uses `publisher_directory` to find it, then `rsl_get`
-
-> "Get me a CDSM Article 4(3) signed receipt for that publisher's reservation state — set `jsonld: true`." — uses `rsl_get` with content negotiation
-
-> "This publisher just signed up: `https://noahpinion.substack.com`. Which onboarding workflow should we use?" — uses `detect_platform`
-
-> "Browse the finance category in the Opedd catalog — show me publishers with at least 50 articles." — uses `publisher_directory`
-
-> "What's in my buyer account? Show me my active API keys." — uses `get_buyer_account` (requires `OPEDD_BUYER_JWT`)
-
-The assistant will call the appropriate Opedd tools and show you the results.
-
-## Payment
-
-**No account? An agent can pay for one answer on the spot.** `POST https://api.opedd.com/agent-answer` with the same body as `search_passages` (`{"query": "..."}`). The response is HTTP 402 with the price (each article the answer uses, at its publication's own price), the licence and the buyer terms. Pay by card through the [Machine Payments Protocol](https://mpp.dev) (a Stripe shared payment token, at least 0.50 USD; the rest stays as credit on a search key returned with the answer) and retry. Machine-readable: [api.opedd.com/openapi.json](https://api.opedd.com/openapi.json).
-
-Pay-per-answer search is billed to the card on your buyer account (opedd.com/buyer/billing); licence orders are paid through Stripe. Single-article purchases (Human republication, `purchase_license`) were retired on 2026-10-26.
+- **With an account:** answers are billed to the card on your buyer account ([opedd.com/buyer/billing](https://opedd.com/buyer/billing)), charged every $25.00 of answers and at month end, with a $500.00 monthly limit for new accounts, raised on request. Licence orders are invoiced through Stripe.
+- **Without an account:** an agent can pay for one answer on the spot. `POST https://api.opedd.com/agent-answer` with the same body as `search_passages`. The HTTP 402 response states the price, the licence and the terms; pay by card through the [Machine Payments Protocol](https://mpp.dev) (at least 0.50 USD, the rest kept as credit) and retry. Machine-readable: [api.opedd.com/openapi.json](https://api.opedd.com/openapi.json).
 
 ## Development
 
@@ -258,27 +200,11 @@ npm run dev   # runs with tsx (no build step)
 npm run build # compiles to dist/
 ```
 
-## How Opedd compares to search APIs
-
-| | Opedd | Generic search APIs |
-|---|---|---|
-| **What you get** | Licensed content + license key + public-record proof — all in one API call | Scraped web content, no rights |
-| **Content delivery** | Full article text via API (JSON) — bulk on flat-fee licenses, per-call (metered) on filtered licenses; real-time feed via webhooks | Scraped snippets or full-page dumps |
-| **Content quality** | Curated publisher content (niche B2B newsletters, expert analysis) | Whatever's on the open web |
-| **Rights** | Verifiable licence for every use, publisher-authorized | No rights clearance |
-| **Proof** | Public record (Tempo) — independently verifiable | None |
-| **Compliance** | Audit log, compliance dossier and full provenance chain | No provenance |
-| **Pricing** | Publisher sets their own prices | Platform decides |
-| **Delivery modes** | Article API, bulk feed (JSON firehose), buyer webhooks (push) | Query-response only |
-| **Protocol** | REST + MCP native | REST only |
-
-Opedd is the **licensed content delivery layer** for AI — not just a licensing wrapper. Publishers upload content, you retrieve it via API with a license attached. One integration gives your pipeline both the content and the legal right to use it.
-
 ## Learn more
 
-- [Opedd for AI Agents](https://opedd.com/for-ai-agents?utm_source=github&utm_medium=readme&utm_campaign=mcp) — full documentation, code examples, endpoint reference
-- [API Docs](https://docs.opedd.com) — OpenAPI spec with agent endpoints
-- [Verify a licence](https://opedd.com/verify?utm_source=github&utm_medium=readme&utm_campaign=mcp) — check any licence key in the public record
+- [Opedd for AI agents](https://opedd.com/for-ai-agents?utm_source=github&utm_medium=readme&utm_campaign=mcp)
+- [Documentation](https://docs.opedd.com), including the [MCP guide](https://docs.opedd.com/mcp-server)
+- [Verify a licence](https://opedd.com/verify?utm_source=github&utm_medium=readme&utm_campaign=mcp)
 
 ## License
 

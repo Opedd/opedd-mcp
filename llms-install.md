@@ -1,15 +1,11 @@
 # Installing the Opedd MCP server (guide for AI agents)
 
-Opedd provides licensed, cited passages from independent publications and research firms for AI answers. Discovery and verification tools work without a key; an agent without an account can pay for a single answer by card at `POST https://api.opedd.com/agent-answer` (Machine Payments Protocol). This file tells an AI agent exactly how to install and configure the server unattended.
+Opedd provides licensed, cited passages from expert publications and research firms for AI answers. Discovery and verification tools work without a key. New buyer accounts get their first 3 answers free. An agent without an account can pay for a single answer by card at `POST https://api.opedd.com/agent-answer` (Machine Payments Protocol). This file tells an AI agent how to install and configure the server unattended.
 
-## Option A — hosted (no install, recommended)
+## Option A: hosted (no install, recommended)
 
-Connect to the hosted Streamable-HTTP endpoint:
-
-- **URL:** `https://mcp.opedd.com/mcp`
-- **Auth (optional):** header `Authorization: Bearer <key>` — public discovery tools (lookup_content, publisher_directory, verify_license, browse_registry, rsl_get, detect_platform) work with NO auth.
-
-Example (Cursor / any headers-capable client):
+- **Connector apps (Claude, ChatGPT):** add `https://mcp.opedd.com` as a custom connector; the user signs in with a work email. No key.
+- **APIs and headers-capable clients:** `https://mcp.opedd.com/mcp` (Streamable HTTP), with optional header `Authorization: Bearer <key>`. These tools need no key: search_content, lookup_content, publisher_directory, request_publication, verify_license, browse_registry, rsl_get.
 
 ```json
 {
@@ -22,9 +18,9 @@ Example (Cursor / any headers-capable client):
 }
 ```
 
-## Option B — local (stdio via npm)
+## Option B: local (stdio via npm)
 
-Requires Node.js >= 20.
+Requires Node.js 20 or later.
 
 ```json
 {
@@ -33,22 +29,22 @@ Requires Node.js >= 20.
       "command": "npx",
       "args": ["-y", "opedd-mcp"],
       "env": {
-        "OPEDD_BUYER_TOKEN": "<optional: opedd_buyer_live_* for content retrieval>",
-        "OPEDD_PUB_BEARER": "<optional: opedd_pub_* for publisher content push>"
+        "OPEDD_BUYER_TOKEN": "<optional: opedd_buyer_live_* for questions, articles and the feed>",
+        "OPEDD_PUB_BEARER": "<optional: opedd_sk_* for publisher tools>"
       }
     }
   }
 }
 ```
 
-All env vars are OPTIONAL — omit any you don't have; the matching tools simply require them at call time with a clear error.
+Every variable is optional. Omit any you don't have; a tool that needs one says which and where to get it. Also available: `OPEDD_ACCESS_KEY` (an order's `ent_*` key, for the feed tools) and `OPEDD_BUYER_JWT` (buyer-portal session, for orders and the account).
 
 ## Where keys come from
 
-- Buyer keys (`opedd_buyer_*`): sign up at https://opedd.com/buyer — self-serve, no approval step.
-- Publisher keys (`opedd_pub_*`): publisher onboarding at https://opedd.com — self-serve.
-- No key at all: discovery + verification tools still work.
+- Buyer keys (`opedd_buyer_*`): sign up at https://opedd.com/buyer/signup, self-serve. Keys are under Account, API keys.
+- Publisher keys (`opedd_sk_*`): the Opedd dashboard at https://opedd.com, Settings, For developers.
+- No key: discovery and verification tools still work.
 
 ## Verify the install
 
-Call the `publisher_directory` tool with `{ "limit": 3 }` — a successful JSON response with a `publishers` array confirms end-to-end connectivity.
+Call `publisher_directory` with `{ "limit": 3 }`. A JSON response with a `publishers` array confirms the connection.

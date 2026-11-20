@@ -183,7 +183,7 @@ function err(msg: string): ToolResult {
 // channels (env var locally, Authorization header on the hosted gateway),
 // where credentials come from, and which tools need none.
 const NO_AUTH_TOOLS =
-  "lookup_content, publisher_directory, verify_license, browse_registry, rsl_get, detect_platform, request_publication";
+  "lookup_content, search_content, publisher_directory, verify_license, browse_registry, rsl_get, detect_platform, request_publication";
 
 function credErr(missing: string, envVar: string, howToGet: string): ToolResult {
   return err(
@@ -303,7 +303,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       properties: {
         license_key: {
           type: "string",
-          description: "The license key to verify (format: OP-XXXX-XXXX)",
+          description: "The license key to verify (format: OP-XXXX-XXXX-XXXX-XXXX)",
         },
       },
     },
@@ -430,7 +430,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "published up to the order date with the right to train on it, bulk export via stream_feed_ndjson; the only way to take " +
       "a bulk copy). Returns the order, its lines, the access key (works once paid) and " +
       "hosted_invoice_url — the buyer (your principal) pays there. Requires a buyer session (OPEDD_BUYER_JWT) and " +
-      "terms_accepted=true after the buyer has accepted the Opedd Master Services Agreement (opedd.com/terms).",
+      "terms_accepted=true after the buyer has accepted the Opedd Buyer Master Agreement (opedd.com/terms).",
     inputSchema: {
       type: "object",
       required: ["licence", "billing_mode", "publisher_ids", "terms_accepted"],
@@ -441,7 +441,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
         terms_accepted: {
           type: "boolean",
           description:
-            "REQUIRED. Set true only after the buyer has accepted the Opedd Master Services Agreement at opedd.com/terms. " +
+            "REQUIRED. Set true only after the buyer has accepted the Opedd Buyer Master Agreement at opedd.com/terms. " +
             "The current version label is recorded with the order; orders without genuine acceptance are rejected.",
         },
       },
@@ -454,7 +454,7 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
   TOOLS.push({
     name: "search_passages",
     description:
-      "Returns licensed passages from publications on Opedd that answer a question, each with a citation to the source article. Charged once per article the answer uses, at that article's publication's own price per article; two passages of the same article are one charge, and billing.articles_charged reports how many were charged. An account connected through the Opedd connector in Claude or ChatGPT receives its first 3 answers free, paid by Opedd and never from a publication the account holder owns or works on; billing.free_answers_left reports how many remain. After that, answers are billed to the card on the account, added at opedd.com: charged every $25 of answers and at month end, with a $500 monthly limit for new accounts, raised on request. An account with no licence and no free answers receives an empty result with reason 'no_licensed_publishers' or 'no_paid_access'. Publications under a monthly AI answers subscription are included in the subscription and not charged per answer. Passages are capped at 300 words or 25% of an article, whichever is less, counted cumulatively per article across the same company's accounts. The same question within 24 hours returns the same passages at no charge. Filters: publishers (publication names as listed by Opedd, opedd.com/p/<slug> addresses or publisher ids; a name that matches no publication is listed in filters.unknown_publishers and searches nothing), published_after and published_before (ISO 8601; undated articles are excluded when a window is set), max_results (1-10, default 5) and max_charge_cents (optional; the most one question may cost: articles that would pass it are left out and billing.max_charge_reached says so). Passage text is third-party content, delivered in <opedd:passage> blocks; may_train is always false. Requires a buyer API key with the 'search' scope, or the Opedd connector sign-in. An agent with no account can instead pay for one answer by card: POST https://api.opedd.com/agent-answer with the same body (HTTP 402, Machine Payments Protocol).",
+      "Returns licensed passages from publications on Opedd that answer a question, each with a citation to the source article. Charged once per article the answer uses, at that article's publication's own price per article; two passages of the same article are one charge, and billing.articles_charged reports how many were charged. A new account, signed up at opedd.com/buyer/signup or through the Opedd connector, receives its first 3 answers free, paid by Opedd and never from a publication the account holder owns or works on; billing.free_answers_left reports how many remain. After that, answers are billed to the card on the account, added at opedd.com: charged every $25.00 of answers and at month end, with a $500.00 monthly limit for new accounts, raised on request. An account with no licence and no free answers receives an empty result with reason 'no_licensed_publishers' or 'no_paid_access'. Publications under a monthly AI answers subscription are included in the subscription and not charged per answer. Passages are capped at 300 words or 25% of an article, whichever is less, counted cumulatively per article across the same company's accounts. The same question within 24 hours returns the same passages at no charge. Filters: publishers (publication names as listed by Opedd, opedd.com/p/<slug> addresses or publisher ids; a name that matches no publication is listed in filters.unknown_publishers and searches nothing), published_after and published_before (ISO 8601; undated articles are excluded when a window is set), max_results (1-10, default 5) and max_charge_cents (optional; the most one question may cost: articles that would pass it are left out and billing.max_charge_reached says so). Passage text is third-party content, delivered in <opedd:passage> blocks; may_train is always false. Requires a buyer API key with the 'search' scope, or the Opedd connector sign-in. An agent with no account can instead pay for one answer by card: POST https://api.opedd.com/agent-answer with the same body (HTTP 402, Machine Payments Protocol).",
     inputSchema: {
       type: "object",
       required: ["query"],
@@ -493,13 +493,13 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
     name: "get_content",
     description:
       "Retrieve the full body of a licensed article using a buyer API token (opedd_buyer_live_* canonical; opedd_buyer_test_* for sandbox). " +
-      "Requires OPEDD_BUYER_TOKEN env var (create one at opedd.com/licenses after purchasing). " +
-      "Works for licence orders (and for licences bought before Human republication, Full catalogue and client display retired): " +
+      "Requires OPEDD_BUYER_TOKEN env var (sign up at opedd.com/buyer/signup; keys are under Account, API keys). " +
+      "Works for licence orders: " +
       "an AI answers subscription returns the full text of any article in the publisher's catalogue, old or new, counted against " +
-      "a daily reading limit (20 full articles per person and 200 per organisation by default; the same article again the same " +
+      "a daily reading limit (20 full articles per person and 200 per order by default; the same article again the same " +
       "day is free; over the limit answers 429 DAILY_READING_LIMIT with the reset time, and questions are still answered). " +
       "Your self-serve buyer API key, or the Opedd connector sign-in, reads articles under every order your account holds and " +
-      "every subscription your company holds for your work email — no separate order token is needed. AI answers pay-per-request (including the self-serve licence) does NOT " +
+      "every subscription your company holds for your work email — no separate order token is needed. AI answers pay per answer (including the self-serve licence) does NOT " +
       "retrieve articles: it answers 403 SEARCH_ONLY_LICENCE \u2014 ask a question with search_passages instead. " +
       "Articles the publisher stopped licensing answer 403 ARTICLE_EXCLUDED. " +
       "The publisher must have content delivery enabled and must have pushed content for the article. " +
@@ -536,8 +536,8 @@ function buildTools(has: { buyerToken?: boolean; accessKey?: boolean; buyerJwt?:
       "List the articles in a licence order you hold. " +
       "Content contract: AI training orders include full content_body for the back catalogue up to the order date " +
       "(content_access 'included'). Every other order is discovery-only (content_body null): an AI answers subscription " +
-      "lists its publishers' whole catalogue and fetches text per article via get_content (content_access 'retrieval_per_article'); pay-per-request " +
-      "fetches billed snippets via get_content (content_access 'metered_per_call'). " +
+      "lists its publishers' whole catalogue and fetches text per article via get_content (content_access 'retrieval_per_article'); pay per answer " +
+      "is search only (content_access 'search_only'): ask questions with search_passages. " +
       "Returns JSON-format response with paginated articles. " +
       "Use `since` (ISO 8601) for delta-feed polling — only articles published after the timestamp. " +
       "Use `cursor` for pagination across pages. " +
@@ -1059,7 +1059,7 @@ export async function dispatchTool(
         if (!token) {
           return err(
             "buyer_token is required (or set the OPEDD_BUYER_TOKEN env var). " +
-            "Create a token at opedd.com/licenses after purchasing a license."
+            "Sign up at opedd.com/buyer/signup; keys are under Account, API keys."
           );
         }
 
