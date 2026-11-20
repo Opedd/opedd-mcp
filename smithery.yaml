@@ -7,16 +7,16 @@ startCommand:
     properties:
       opeddBuyerToken:
         type: string
-        description: Buyer API token (opedd_buyer_live_*) — enables content retrieval
+        description: Buyer API key (opedd_buyer_live_*): questions, articles, the feed and audit tools
       opeddAccessKey:
         type: string
-        description: Enterprise access key (ent_*) — enables bulk feed tools
+        description: An order's access key (ent_*): the feed tools
       opeddBuyerJwt:
         type: string
-        description: Buyer portal session JWT — account/audit/compliance tools
+        description: Buyer portal session token: orders, the account and audit tools
       opeddPubBearer:
         type: string
-        description: Publisher API key (opedd_pub_*) — publisher push tools
+        description: Publisher API key (opedd_sk_*): publisher listing and push tools
   commandFunction: |-
     (config) => ({
       command: 'node',

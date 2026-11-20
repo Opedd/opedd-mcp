@@ -6,45 +6,45 @@
     "url": "https://github.com/Opedd/opedd-mcp",
     "source": "github"
   },
-  "version": "0.12.15",
+  "version": "0.12.20",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "opedd-mcp",
-      "version": "0.12.15",
+      "version": "0.12.20",
       "transport": {
         "type": "stdio"
       },
       "environmentVariables": [
         {
           "name": "OPEDD_BUYER_TOKEN",
-          "description": "Buyer API token (opedd_buyer_live_*) \u2014 enables licensed content retrieval",
+          "description": "Buyer API key (opedd_buyer_live_*): questions, articles, the feed and audit tools",
           "isRequired": false,
           "isSecret": true
         },
         {
           "name": "OPEDD_ACCESS_KEY",
-          "description": "Enterprise access key (ent_*) \u2014 enables bulk feed tools",
+          "description": "An order's access key (ent_*): the feed tools",
           "isRequired": false,
           "isSecret": true
         },
         {
           "name": "OPEDD_BUYER_JWT",
-          "description": "Buyer portal session JWT \u2014 enables account, audit and compliance tools",
+          "description": "Buyer portal session token: orders, the account and audit tools",
           "isRequired": false,
           "isSecret": true
         },
         {
           "name": "OPEDD_PUB_BEARER",
-          "description": "Publisher API key (opedd_sk_*) \u2014 enables publisher content push + listing tools",
+          "description": "Publisher API key (opedd_sk_*): publisher listing and push tools",
           "isRequired": false,
           "isSecret": true
         }
       ]
     }
   ],
-  "title": "Opedd \u2014 Licensed Content for AI",
+  "title": "Opedd: Licensed Content for AI",
   "websiteUrl": "https://opedd.com/for-ai-agents?utm_source=mcp-registry&utm_medium=listing&utm_campaign=mcp",
   "icons": [
     {
@@ -62,11 +62,15 @@
       "headers": [
         {
           "name": "Authorization",
-          "description": "Optional: Bearer <your Opedd key> (opedd_sk_* publisher, opedd_buyer_* buyer, or ent_* enterprise). Public discovery tools work without auth.",
+          "description": "Optional: Bearer <your Opedd key> (opedd_buyer_* buyer, ent_* order, or opedd_sk_* publisher). Discovery tools work without a key.",
           "isRequired": false,
           "isSecret": true
         }
       ]
+    },
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.opedd.com"
     }
   ]
 }
